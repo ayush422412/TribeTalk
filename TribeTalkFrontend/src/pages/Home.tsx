@@ -1,7 +1,10 @@
+import { LeftSidebar } from '../components';
+import RightContent from '../components/RightContent';
 const Home = () => {
   return (
-    <div>
-      <h2>This is home page</h2>
+    <div className='min-w-screen flex'>
+      <LeftSidebar/>
+      <RightContent/>
     </div>
   );
 };
