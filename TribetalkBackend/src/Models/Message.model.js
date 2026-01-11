@@ -15,11 +15,6 @@ const messageSchema = new Schema(
       required: true,
     },
 
-    server: {
-      type: Types.ObjectId,
-      ref: "Server",
-      required: true,
-    },
 
     channel: {
       type: Types.ObjectId,

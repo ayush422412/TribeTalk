@@ -12,11 +12,11 @@ const userSchema = new Schema(
             trim:true,
             index:true,
         },
-        name:{
-            type:String,
-            required:true,
-            index:true,
-        },
+        // name:{
+        //     type:String,
+        //     required:true,
+        //     index:true,
+        // },
         password:{
             type:String,
             required:[true, 'Password is required']
@@ -53,7 +53,7 @@ userSchema.methods.generateAccessToken = function(){
             _id: this._id,
             email: this.email,
             username: this.username,
-            fullName: this.fullName
+            // fullName: this.fullName
         },
         process.env.ACCESS_TOKEN_SECRET,
         {
