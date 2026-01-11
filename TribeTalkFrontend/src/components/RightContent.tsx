@@ -12,9 +12,15 @@ const RightContent = () => {
   const activeServer = useSelector(
     (state: RootState) => state.server
   );
+  const activeChannel = useSelector(
+    (state: RootState) => state.channel
+  );
 return (
     <h1>
         {activeServer.name}
+        {activeChannel.name}
+        
+        
     </h1>
 )
 

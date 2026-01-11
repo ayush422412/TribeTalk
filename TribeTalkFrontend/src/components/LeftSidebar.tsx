@@ -2,11 +2,18 @@ import React, { useState } from "react";
 import type { RootState } from "../../app/store";
 import { useSelector, useDispatch } from "react-redux";
 import { changeserver } from "../features/server/Server";
-
+import { changeChannel } from "../features/channel/Channel";
+// interface User {
+//   id: number;
+//   name: string;
+// }
 interface Channel {
   id: number;
   name: string;
+  description : string;
+  members :string[];
 }
+
 
 interface Server {
   id: number;
@@ -17,27 +24,27 @@ interface Server {
 const LeftSidebar = () => {
   const [servers] = useState<Server[]>([
     {
-      id: 1,
+      id: 0,
       name: "Server 1",
       channels: [
-        { id: 1, name: "general" },
-        { id: 2, name: "random" },
+        { id: 1, name: "general", description: "General discussion" , members : []},
+        { id: 2, name: "random", description: "Random conversations" , members : []},
       ],
     },
     {
       id: 2,
       name: "Server 2",
       channels: [
-        { id: 3, name: "announcements" },
-        { id: 4, name: "gaming" },
+        { id: 3, name: "announcements", description: "Official announcements", members : [] },
+        { id: 4, name: "gaming", description: "Gaming discussions", members : [] },
       ],
     },
     {
       id: 3,
       name: "Server 3",
       channels: [
-        { id: 5, name: "chat" },
-        { id: 6, name: "projects" },
+        { id: 5, name: "chat", description: "Chat discussions", members : [] },
+        { id: 6, name: "projects", description: "Project discussions", members : [] },
       ],
     },
   ]);
@@ -46,8 +53,18 @@ const LeftSidebar = () => {
   const activeServer = useSelector(
     (state: RootState) => state.server
   );
+  const activechannel=useSelector(
+    (state: RootState) => state.channel
+  );
 
   const dispatch = useDispatch();
+  console.log(activeServer);
+  servers
+      .find((s) => s.id === activeServer.id)!
+      .channels.map((channel) => (
+       console.log(channel)
+      )) 
+  
 
   return (
     <div className="w-64 h-screen bg-gray-800 text-white flex flex-col p-4">
@@ -59,6 +76,7 @@ const LeftSidebar = () => {
           <button
             key={server.id}
             onClick={() => dispatch(changeserver(server))}
+
             className={`p-2 rounded text-left hover:bg-gray-700 ${
               activeServer === server ? "bg-gray-700" : ""
             }`}
@@ -67,24 +85,26 @@ const LeftSidebar = () => {
           </button>
         ))}
       </div>
+      
 
-      {/* Channels of active server */}
-      {/* {activeServer && (
-        <div className="flex flex-col gap-2">
-          <h2 className="font-semibold text-gray-300">Channels</h2>
-          {servers
-            .find((s) => s === activeServer)!
-            .channels.map((channel) => (
-              <a
-                key={channel.id}
-                href="#"
-                className="hover:bg-gray-700 p-2 rounded"
-              >
-                #{channel.name}
-              </a>
-            ))}
-        </div>
-      )} */}
+   {activeServer && (
+  <div className="flex flex-col gap-2" >
+    <h2 className="font-semibold text-gray-300">Channels</h2>
+    {servers
+      .find((s) => s.id === activeServer.id)!
+      .channels.map((channel) => (
+        <a
+          key={channel.id}
+          onClick={() => dispatch(changeChannel(channel))}
+          href="#"
+          className="hover:bg-gray-700 p-2 rounded"
+        >
+          {channel.name}
+        </a>
+      ))}
+  </div>
+)}
+
     </div>
   );
 };

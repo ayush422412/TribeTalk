@@ -1,9 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit'
 import  ServerReducer  from '../src/features/server/Server'
+import  ChannelReducer  from '../src/features/channel/Channel'
 
 export const store = configureStore({
   reducer: {
     server:ServerReducer,
+    channel :ChannelReducer
   },
 })
 
