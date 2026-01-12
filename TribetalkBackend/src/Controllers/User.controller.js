@@ -1,7 +1,7 @@
 import { asyncHandler } from "../Utils/asyncHandler.js";
 import {ApiError} from "../Utils/ApiError.js"
 import { User} from "../Models/User.model.js"
-import { ApiResponse } from "../utils/ApiResponse.js";
+import { ApiResponse } from "../Utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose";
 
@@ -250,11 +250,11 @@ export {
     loginUser,
     logoutUser,
     refreshAccessToken,
-    changeCurrentPassword,
+    // changeCurrentPassword,
     getCurrentUser,
-    updateAccountDetails,
-    updateUserAvatar,
-    updateUserCoverImage,
-    getUserChannelProfile,
-    getWatchHistory
+    // updateAccountDetails,
+    // updateUserAvatar,
+    // updateUserCoverImage,
+    // getUserChannelProfile,
+    // getWatchHistory
 }

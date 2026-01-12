@@ -15,21 +15,22 @@ export default function setupGateway(io) {
         });
 
 
-
+        // Add Message to the database.
         socket.on("addMessage", async ({ channelId, message, UserId }) => {
 
             const savedMessage = await addMessage({ message, UserId, channelId });
-
             socket.to(channelId).broadcast("newMessage", savedMessage.content);
-
 
         });
 
-        socket.on("joinChannel", ({ socket, channelId }) => {
+        
+        // Join a channel(room, room hopping, socket joining, 
+        // not to be confused with joining a channel in discord.)
+        socket.on("joinChannel", ({ channelId }) => {
             channelManager.joinActiveChannel(socket, channelId);
         });
 
-        socket.on("leaveChannel", ({ socket, channelId }) => {
+        socket.on("leaveChannel", ({ channelId }) => {
             channelManager.leaveActiveChannel(socket, channelId);
         });
 

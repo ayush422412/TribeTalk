@@ -1,19 +1,12 @@
-
 import "dotenv/config";
-import express from "express";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 
-import setupGateway from "./Utils/socket/gateway.js";
+import { app } from "./app.js";  
+import connectDB from "./Repository/index.js";
+import setupGateway from "./socket/gateway.js";
 
-
-dotenv.config({
-    path: './.env'
-})
-
-const app = express();
-app.use(express.json());
-
+// Optional: add test route
 app.get("/", (req, res) => {
   res.send("<h1>Server is running</h1>");
 });
@@ -30,17 +23,18 @@ setupGateway(io);
 
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await connectDB();
+    console.log("✅ MongoDB connected");
 
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running at http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
+  }
+};
 
-// connectDB()
-// .then(() => {
-//     app.listen(process.env.PORT || 8000, () => {
-//         console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
-//     })
-// })
-// .catch((err) => {
-//     console.log("MONGO db connection failed !!! ", err);
-// })
+startServer();
