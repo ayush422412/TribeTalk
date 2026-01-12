@@ -1,5 +1,5 @@
 // services/message.service.js
-import * as messageRepo from "../repositories/message.repository.js";
+import * as messageRepo from "../Repository/Message.repository.js";
 import { ApiError } from "../Utils/ApiError.js";
 
 export const addMessage = async ({ content, UserId, channelId }) => {
