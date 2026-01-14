@@ -13,9 +13,9 @@ const router = Router()
 
 //secured routes
 router.route("/create-channel").post(verifyJWT, createChannel)
-router.route("/delete-channel/:id").delete(verifyJWT, deleteChannel)
 router.patch("/edit-channel/:id", verifyJWT, editChannel)
 router.get("/channel-info/:id", verifyJWT, getChannelInfo);
+router.route("/delete-channel/:id").delete(verifyJWT, deleteChannel)
 
 // router.route("/create-server").post(verifyJWT, createServer)
 // router.route("/list-all-server").get(verifyJWT, listServers)

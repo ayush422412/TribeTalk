@@ -84,7 +84,6 @@ const deleteChannel = asyncHandler(async (req, res) => {
 });
 
 
-
 const editChannel = asyncHandler(async (req, res) => {
     const channelId = req.params.id; // channel ID in URL param
     const { name, description } = req.body; // optional new name & description
