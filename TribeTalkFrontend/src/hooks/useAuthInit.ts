@@ -15,12 +15,12 @@ export const useAuthInit = () => {
         console.log("authinit")
         
         const { data } = await authApi.refreshToken()
-        console.log("authinit",data)
+        console.log("authinitdfbvdsf",data?.data?.accessToken)
 
         dispatch(
           setAuth({
             user,
-            token: data.accessToken,
+            token: data?.data?.accessToken,
           })
         )
       } catch {

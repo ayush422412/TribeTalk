@@ -142,7 +142,8 @@ const loginUser = asyncHandler(async (req, res) => {
     const options = {
         httpOnly: true,
         secure: false,
-        sameSite:"None"
+        sameSite:"lax",
+        maxAge: 60 * 60 * 1000,
     }
 
     return res
@@ -219,6 +220,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     secure: false,     // 🔴 localhost
     sameSite: "lax",
     path: "/",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   };
 
   return res
