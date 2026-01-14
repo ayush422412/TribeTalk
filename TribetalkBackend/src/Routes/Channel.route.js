@@ -1,0 +1,29 @@
+import { Router } from "express";
+import {
+    createChannel,
+    deleteChannel,
+    editChannel,
+    getChannelInfo
+
+} from "../Controllers/Channel.controller.js";
+import { verifyJWT } from "../Middlewares/Auth.middleware.js";
+
+
+const router = Router()
+
+//secured routes
+router.route("/create-channel").post(verifyJWT, createChannel)
+router.route("/delete-channel/:id").delete(verifyJWT, deleteChannel)
+router.patch("/edit-channel/:id", verifyJWT, editChannel)
+router.get("/channel-info/:id", verifyJWT, getChannelInfo);
+
+// router.route("/create-server").post(verifyJWT, createServer)
+// router.route("/list-all-server").get(verifyJWT, listServers)
+// router.patch("/edit-server/:id", verifyJWT, editServer)
+// router.route("/delete-server/:id").delete(verifyJWT, deleteServer)
+
+// router.get("/single-server/:id", verifyJWT, getServerInfo); // Get full server info
+// router.post("/join-server/:id", verifyJWT, joinServer)
+
+
+export default router
