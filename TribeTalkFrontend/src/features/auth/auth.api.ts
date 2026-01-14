@@ -19,7 +19,7 @@ export const authApi = {
     api.post("/users/logout"),
 
   refreshToken: () =>
-    api.post<{ accessToken: string }>("/users/refresh-token"),
+    api.post<{ data: { accessToken: string }; message: string }>("/users/refresh-token"),
 
   getCurrentUser: () =>
     api.get<AuthResponse["user"]>("/users/current-user"),
