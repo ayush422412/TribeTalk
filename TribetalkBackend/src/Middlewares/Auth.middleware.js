@@ -29,3 +29,14 @@ export const verifyJWT = asyncHandler(async(req, _, next) => {
     }
     
 })
+
+
+
+
+export async function getUserFromToken(token) {
+    if (!token) return null;
+
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const user = await User.findById(decoded._id).select("-password -refreshToken");
+    return user;
+}

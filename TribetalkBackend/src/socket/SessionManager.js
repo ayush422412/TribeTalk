@@ -4,12 +4,13 @@ export default class SessionManager {
     this.socketToUser = new Map();
   }
 
-  addUser(userId, socketId) {
-    this.userToSocket.set(userId, socketId);
-    this.socketToUser.set(socketId, userId);
-  }
+  // addUser(userId, socketId) {
+  //   this.userToSocket.set(userId, socketId);
+  //   this.socketToUser.set(socketId, userId);
+  // }
 
   addUser(userId, socketId) {
+    console.log(userId,socketId)
     if (!this.userToSocket.has(userId)) {
       this.userToSocket.set(userId, new Set());
     }
