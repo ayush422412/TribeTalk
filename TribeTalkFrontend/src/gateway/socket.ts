@@ -61,12 +61,18 @@ class SocketGateway {
     this.socket?.on("channels", handler)
   }
 
-  onMessage(handler: (message: Message) => void) {
-    this.socket?.on("new_message", handler)
-  }
+onMessage(handler: (message: Message) => void) {
+  this.socket?.on("new_message", (message: Message) => {
+    console.log("new_message received on client:", message);
+    handler(message);
+  });
+}
 
   onNewMessage(handler: (message: Message) => void) {
-    this.socket?.on("new_message", handler)
+    this.socket?.on("new_message", (message: Message) => {
+    console.log("new_message received on client:", message);
+    handler(message);
+  });
   }
 
   onMessageEdited(handler: (message: Message) => void) {
