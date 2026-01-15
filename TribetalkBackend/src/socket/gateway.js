@@ -59,7 +59,7 @@ export default function setupGateway(io) {
         }
     });
 
-    
+
 
 
     io.on("connection", (socket) => {
@@ -76,22 +76,34 @@ export default function setupGateway(io) {
 
         // Add Message to the database.
         socket.on("send_message", async ({ channelId, content }) => {
-            const UserId =socket.user._id;
+            const UserId = socket.user._id;
 
-            const savedMessage = await addMessage({ content, channelId,UserId });
-            
-            socket.to(channelId).emit("new_message", savedMessage.content);
+            console.log("message received on server:", { channelId, content, UserId });
+
+            const savedMessage = await addMessage({ content, channelId, UserId });
+
+            console.log("saved message:", savedMessage);
+
+            const messageDTO = {
+                id: savedMessage._id.toString(),
+                content: savedMessage.content,
+                senderId: savedMessage.sender.toString(),
+                channelId: savedMessage.channel.toString(),
+                timestamp: savedMessage.createdAt.toISOString()
+            };
+            console.log("emitting to channel:", channelId, "message:", messageDTO);
+            // socket.to(`${channelId}`).emit("new_message", messageDTO);
+            io.to(`${channelId}`).emit("new_message", messageDTO);
 
         });
 
 
         // Join a channel(room, room hopping, socket joining, 
         // not to be confused with joining a channel in discord.)
-        socket.on("join_channel", async({ socket,channelId }) => {
+        socket.on("join_channel", async ({ channelId }) => {
             console.log("channel id", channelId)
-
-            channelManager.joinActiveChannel(socket, channelId);
-        });
+            socket.join(`${channelId}`)
+        })
 
         socket.on("leaveChannel", ({ channelId }) => {
             channelManager.leaveActiveChannel(socket, channelId);
@@ -99,7 +111,7 @@ export default function setupGateway(io) {
 
 
 
-        
+
 
 
 
