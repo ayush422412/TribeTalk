@@ -1,5 +1,10 @@
 import { Routes, Route, Navigate } from "react-router-dom"
 import { useAuth } from "./features/auth/useAuth"
+import { useEffect } from "react"
+import { useDispatch } from "react-redux"
+import type { AppDispatch } from "./app/store"
+import { initializeMessageSync, cleanupMessageSync } from "./features/messages/socketMessageSync"
+import { socketGateway } from "./gateway/socket"
 
 // pages
 import Login from "./pages/Login"
@@ -7,9 +12,27 @@ import Register from "./pages/Register"
 import Home from "./pages/Home"
 
 function App() {
-  const { isAuthenticated, token } = useAuth()
-  console.log("data",isAuthenticated, token)
+  // const { isAuthenticated, token } = useAuth()
+  // console.log("data",isAuthenticated, token)
+  const dispatch = useDispatch<AppDispatch>()
+  const { token, isAuthenticated } = useAuth()
   const isLoggedIn = Boolean(isAuthenticated && token)
+
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      // Connect socket
+      console.log("Connecting socket with token:", token)
+      socketGateway.connect(token)
+
+      // Initialize message sync (socket listeners)
+      initializeMessageSync(dispatch)
+
+      // Cleanup on unmount
+      return () => {
+        cleanupMessageSync()
+      }
+    }
+  }, [isAuthenticated, token, dispatch])
 
   return (
     <Routes>

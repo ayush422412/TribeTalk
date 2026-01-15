@@ -1,7 +1,6 @@
 import  { createSlice } from "@reduxjs/toolkit"
 import type User from "../auth.types"
 import type { PayloadAction } from "@reduxjs/toolkit"
-import type AuthState  from "@auth0/auth0-react/dist/auth-state"
 
 
 type AuthState = {

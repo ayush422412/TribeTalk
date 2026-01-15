@@ -1,6 +1,9 @@
+// features/messages/message.slice.ts (FIXED - string channel IDs)
 import { createSlice } from "@reduxjs/toolkit"
 import type { PayloadAction } from "@reduxjs/toolkit"
-import type { Message, MessageState } from "./types"
+import type { Message, MessageState } from "../types"
+
+const MAX_MESSAGES_PER_CHANNEL = 100
 
 const initialState: MessageState = {
   messagesByChannel: {}
@@ -12,29 +15,40 @@ const messageSlice = createSlice({
   reducers: {
     /**
      * Replace all messages for a channel.
-     * Called when user first joins a channel or fetches previous messages.
      */
     setMessagesForChannel(
       state,
-      action: PayloadAction<{ channelId: number; messages: Message[] }>
+      action: PayloadAction<{ channelId: string; messages: Message[] }>  // FIXED: number → string
     ) {
-      state.messagesByChannel[action.payload.channelId] =
-        action.payload.messages
+      const { channelId, messages } = action.payload
+      // Keep only last 100 messages
+      state.messagesByChannel[channelId] = messages.slice(-MAX_MESSAGES_PER_CHANNEL)
     },
 
     /**
      * Add a single message to a channel.
-     * Called when a new message is sent or received in real-time.
      */
     addMessage(
       state,
-      action: PayloadAction<{ channelId: number; message: Message }>
+      action: PayloadAction<{ channelId: string; message: Message }>  // FIXED: number → string
     ) {
       const { channelId, message } = action.payload
       if (!state.messagesByChannel[channelId]) {
         state.messagesByChannel[channelId] = []
       }
-      state.messagesByChannel[channelId].push(message)
+      
+      const messages = state.messagesByChannel[channelId]
+      
+      // Avoid duplicates
+      const exists = messages.some(m => m.id === message.id)
+      if (!exists) {
+        messages.push(message)
+      }
+      
+      // Trim to last 100 messages if exceeded
+      if (messages.length > MAX_MESSAGES_PER_CHANNEL) {
+        state.messagesByChannel[channelId] = messages.slice(-MAX_MESSAGES_PER_CHANNEL)
+      }
     },
 
     /**
@@ -42,7 +56,7 @@ const messageSlice = createSlice({
      */
     editMessage(
       state,
-      action: PayloadAction<{ channelId: number; message: Message }>
+      action: PayloadAction<{ channelId: string; message: Message }>  // FIXED: number → string
     ) {
       const { channelId, message } = action.payload
       const messages = state.messagesByChannel[channelId]
@@ -58,7 +72,7 @@ const messageSlice = createSlice({
      */
     deleteMessage(
       state,
-      action: PayloadAction<{ channelId: number; messageId: number }>
+      action: PayloadAction<{ channelId: string; messageId: number }>  // FIXED: number → string
     ) {
       const { channelId, messageId } = action.payload
       const messages = state.messagesByChannel[channelId]

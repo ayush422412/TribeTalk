@@ -1,36 +1,41 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { authApi } from "../features/auth/auth.api"
+import { useLoginMutation, useGetCurrentUserQuery } from "../features/auth/auth.api"
 import { useAuth } from "../features/auth/useAuth"
-
+import { useDispatch } from "react-redux"
+import { authApi } from "../features/auth/auth.api"
 const Login = () => {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
 
   const navigate = useNavigate()
   const { setAuth } = useAuth()
 
-  const submitHandler = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
+  // RTK Query hooks for login mutation and getCurrentUser query
+  const [login, { isLoading }] = useLoginMutation()
+  // const { refetch: refetchCurrentUser } = useGetCurrentUserQuery(undefined, {
+  //   skip: true, // we want to manually trigger refetch after login
+  // })
+  const dispatch = useDispatch()
 
-    try {
-      const loginRes = await authApi.login({ email, password })
-      console.log(loginRes)
-      console.log( loginRes.data?.data?.accessToken)
-      const { data: user } = await authApi.getCurrentUser()
-      
-      setAuth(user, loginRes.data?.data?.accessToken ?? null)
+const submitHandler = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault()
+  try {
+    const loginRes = await login({ email, password }).unwrap()
 
-      navigate("/home", { replace: true })
-    } catch (err) {
-      console.error("Login failed", err)
-      alert("Invalid credentials")
-    } finally {
-      setLoading(false)
-    }
+    // Manually fetch current user
+    const user = await dispatch(authApi.endpoints.getCurrentUser.initiate()).unwrap()
+
+    // Set auth state
+    setAuth(user, loginRes.data?.accessToken ?? null)
+
+    navigate("/home", { replace: true })
+  } catch (err) {
+    console.error("Login failed", err)
+    alert("Invalid credentials")
   }
+}
+
 
   return (
     <div className="flex justify-center items-center h-screen">
@@ -61,10 +66,10 @@ const Login = () => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isLoading}
             className="mt-7 text-white hover:bg-emerald-700 bg-emerald-600 text-lg py-2 px-8 w-full rounded-full"
           >
-            {loading ? "Logging in..." : "Log in"}
+            {isLoading ? "Logging in..." : "Log in"}
           </button>
         </form>
       </div>
