@@ -1,15 +1,16 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { authApi } from "../features/auth/auth.api"
+import { useRegisterMutation } from "../features/auth/auth.api"
 
 function Register() {
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [loading, setLoading] = useState(false)
 
   const navigate = useNavigate()
+
+  const [register, { isLoading }] = useRegisterMutation()
 
   const submitHandler = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -20,16 +21,12 @@ function Register() {
     }
 
     try {
-      setLoading(true)
-
-      await authApi.register({ username, email, password })
-
+      // call the RTK Query mutation and unwrap the response to catch errors properly
+      await register({ username, email, password }).unwrap()
       navigate("/login", { replace: true })
     } catch (error) {
       console.error("Registration failed", error)
       alert("Registration failed")
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -80,10 +77,10 @@ function Register() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isLoading}
             className="bg-emerald-500 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-full w-full"
           >
-            {loading ? "Creating account..." : "Sign Up"}
+            {isLoading ? "Creating account..." : "Sign Up"}
           </button>
         </form>
       </div>

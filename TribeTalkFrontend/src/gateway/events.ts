@@ -2,31 +2,31 @@
 
 import { socketGateway } from "./socket"
 import { store } from "../app/store"
-import { setServers } from "../stores/server.slice"
-import { setChannelsForServer } from "../stores/channel.slice"
+// import { setServers } from "../features/servers/server.slice"
+// import { setChannelsForServer } from "../features/channels/channel.slice"
 import {
   setMessagesForChannel,
   addMessage,
   editMessage,
   deleteMessage
-} from "../stores/message.slice"
+} from "../features/messages/message.slice"
 
 
 /**
  * Registers all socket → redux bindings.
  * This should be called ONCE during app startup.
  */
-export function registerSocketEvents() {
-  // Server list received from backend
-  socketGateway.onServers(servers => {
-    store.dispatch(setServers(servers))
-  })
+// export function registerSocketEvents() {
+//   // Server list received from backend
+//   socketGateway.onServers(servers => {
+//     store.dispatch(setServers(servers))
+//   })
 
-  // Channel list for a specific server
-  socketGateway.onChannels(({ serverId, channels }) => {
-    store.dispatch(setChannelsForServer({ serverId, channels }))
-  })
-}
+//   // Channel list for a specific server
+//   socketGateway.onChannels(({ serverId, channels }) => {
+//     store.dispatch(setChannelsForServer({ serverId, channels }))
+//   })
+// }
 
 
 export function registerMessageEvents() {

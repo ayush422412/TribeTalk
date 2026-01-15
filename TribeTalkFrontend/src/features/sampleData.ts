@@ -1,5 +1,5 @@
 // sampleData.ts
-import type { Server, Channel } from "../stores/types"
+import type { Server, Channel } from "./types"
 
 export const sampleServers: Server[] = [
   { id: 1, name: "Server 1" },

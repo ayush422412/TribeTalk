@@ -1,22 +1,35 @@
-import { useDispatch, useSelector } from "react-redux"
-import { setActiveChannel } from "../stores/channel.slice"
+// hooks/useChannel.ts (FIXED)
+import { useDispatch } from "react-redux"
+import { setActiveChannel } from "../features/channels/channel.slice"
+import { useGetServerByIdQuery } from "../features/servers/server.api"
 import { socketGateway } from "../gateway/socket"
-// import { RootState } from "../app/store"
-import type { RootState } from "../app/store";
+import React from "react"
 
-export function useChannel(serverId: number | null) {
+export function useChannel(serverId: string | null) {
   const dispatch = useDispatch()
-  const channels =
-    useSelector(
-      (s: RootState) =>
-        serverId ? s.channel.channelsByServer[serverId] : []
-    ) || []
+
+  const { data: server, isLoading, refetch } = useGetServerByIdQuery(serverId ?? "", {
+    skip: !serverId
+  })
+
+  const channels = React.useMemo(() => server?.channels ?? [], [server?.channels])
+
+  const selectChannel = (channelId: string) => {
+    dispatch(setActiveChannel(channelId))
+    socketGateway.joinChannel(channelId)  // FIXED: now receives string
+  }
+
+  // FIXED: Added refetchChannels function
+  const refetchChannels = React.useCallback(() => {
+    if (serverId) {
+      refetch()
+    }
+  }, [serverId, refetch])
 
   return {
     channels,
-    selectChannel(channelId: number) {
-      dispatch(setActiveChannel(channelId))
-      socketGateway.joinChannel(channelId)
-    }
+    selectChannel,
+    isLoading,
+    refetchChannels  // FIXED: Now exposed
   }
 }

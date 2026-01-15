@@ -1,86 +1,88 @@
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { useRightContent } from "../hooks/useRightContent"
-import { authApi } from "../features/auth/auth.api"
-import { useAuth } from "../features/auth/useAuth"
+// components/RightContent.tsx (FIXED - string channel IDs)
+
+import { useState, useEffect, useRef } from "react"
+import { useSelector } from "react-redux"
+import type { RootState } from "../app/store"
+import { useMessages } from "../hooks/useMessages"
 
 const RightContent = () => {
-  const { activeServer, activeChannel, messages, sendMessage } =
-    useRightContent()
-  const [newMessage, setNewMessage] = useState("")
+  const [messageInput, setMessageInput] = useState("")
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const navigate = useNavigate()
-  const { clearAuth } = useAuth()
+  // Get active channel ID from Redux (now string | null)
+  const activeChannelId = useSelector(
+    (state: RootState) => state.channel.activeChannelId
+  )
 
-  if (!activeServer || !activeChannel) {
-    return <h1 className="p-4">Select a server and channel</h1>
+  // Get messages and send function
+  const { messages, sendMessage } = useMessages(activeChannelId)
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!messageInput.trim()) return
+
+    sendMessage(messageInput.trim())
+    setMessageInput("")
   }
 
-  const handleSend = () => {
-    if (!newMessage.trim()) return
-    sendMessage(newMessage, 1) // TODO: replace with real userId
-    setNewMessage("")
-  }
-
-  const handleLogout = async() => {
-
-
-    try {
-
-
-      const logout = await authApi.logout();
-      clearAuth()
-
-      navigate("/login", { replace: true })
-      
-    } catch (error) {
-      
-    }
-    clearAuth()
-    navigate("/login", { replace: true })
+  // No channel selected
+  if (!activeChannelId) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-900 text-gray-400">
+        <p>Select a channel to start messaging</p>
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col h-full p-4 relative">
-      {/* Logout button */}
-      <button
-        onClick={handleLogout}
-        className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded"
-      >
-        Logout
-      </button>
-
-      <h1 className="text-xl font-bold mb-4">
-        {activeServer.name} / #{activeChannel.name}
-      </h1>
-
-      <div className="flex-1 overflow-y-auto border p-2 mb-4">
-        {messages.map((msg) => (
-          <div key={msg.id} className="mb-2">
-            <strong>{msg.senderId}:</strong> {msg.content}
-          </div>
-        ))}
+    <div className="flex-1 flex flex-col bg-gray-900">
+      {/* Messages List */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {messages.length === 0 ? (
+          <p className="text-gray-500 text-center mt-10">No messages yet. Be the first to send one!</p>
+        ) : (
+          messages.map((msg) => (
+            <div key={msg.id} className="bg-gray-800 p-3 rounded">
+              <div className="flex items-baseline gap-2">
+                <span className="text-blue-400 font-semibold">
+                  User {msg.senderId}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : ""}
+                </span>
+              </div>
+              <p className="text-gray-200 mt-1">{msg.content}</p>
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
-      <div className="flex">
-        <input
-          type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          className="flex-1 p-2 border rounded-l"
-          placeholder="Type a message..."
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-        />
-        <button
-          onClick={handleSend}
-          className="p-2 bg-blue-500 text-white rounded-r"
-        >
-          Send
-        </button>
-      </div>
+      {/* Message Input */}
+      <form onSubmit={handleSendMessage} className="p-4 bg-gray-800 border-t border-gray-700">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={messageInput}
+            onChange={(e) => setMessageInput(e.target.value)}
+            placeholder="Type a message..."
+            className="flex-1 bg-gray-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-500"
+          >
+            Send
+          </button>
+        </div>
+      </form>
     </div>
   )
 }
 
 export default RightContent
-
