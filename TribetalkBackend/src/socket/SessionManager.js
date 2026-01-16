@@ -4,13 +4,7 @@ export default class SessionManager {
     this.socketToUser = new Map();
   }
 
-  // addUser(userId, socketId) {
-  //   this.userToSocket.set(userId, socketId);
-  //   this.socketToUser.set(socketId, userId);
-  // }
-
   addUser(userId, socketId) {
-    console.log(userId,socketId)
     if (!this.userToSocket.has(userId)) {
       this.userToSocket.set(userId, new Set());
     }
@@ -23,14 +17,24 @@ export default class SessionManager {
     const userId = this.socketToUser.get(socketId);
     if (!userId) return;
 
-    this.userToSocket.get(userId)?.delete(socketId);
-    if (this.userToSocket.get(userId)?.size === 0) {
+    const socketSet = this.userToSocket.get(userId);
+    socketSet?.delete(socketId);
+
+    if (socketSet?.size === 0) {
       this.userToSocket.delete(userId);
     }
 
     this.socketToUser.delete(socketId);
   }
 
+  removeUser(userId) {
+    const socketSet = this.userToSocket.get(userId);
+    if (!socketSet) return;
 
+    for (const socketId of socketSet) {
+      this.socketToUser.delete(socketId);
+    }
 
+    this.userToSocket.delete(userId);
+  }
 }

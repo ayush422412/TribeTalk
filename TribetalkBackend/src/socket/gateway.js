@@ -1,42 +1,24 @@
+// gateway.js (COMPLETE with cursor-based messaging)
 import SessionManager from "./SessionManager.js";
 import ChannelManager from "./ChannelManager.js";
-import { addMessage } from "../Service/Message.service.js";
+import { getUserFromToken } from "../Middlewares/Auth.middleware.js";
+import * as messageService from "../Service/Message.service.js";
 
-import { getUserFromToken } from "../Middlewares/Auth.middleware.js"
-
-
-
-
+// Store for typing indicators (in-memory)
+const typingUsers = new Map(); // channelId -> Set of userIds
 
 export default function setupGateway(io) {
     const sessionManager = new SessionManager();
     const channelManager = new ChannelManager(io, sessionManager);
 
-    // io.use(async (socket, next) => {
-    //     const token = socket.handshake.auth.token;
-    //     if (!token) return next(new Error("Authentication error"));
-
-    //     try {
-    //         const user = await getUserFromToken(token); // use your function
-    //         if (!user) return next(new Error("Invalid token"));
-
-    //         socket.user = user; // attach the user to the socket
-    //         next(); // allow the connection
-    //     } catch (err) {
-    //         next(new Error("Authentication error"));
-    //     }
-    // });
-
-
-    // for postmen testing
+    // Authentication middleware
     io.use(async (socket, next) => {
         try {
-            // 1️⃣ Frontend (socket.io client)
+            // Try frontend (socket.io client) auth
             let token = socket.handshake.auth?.token;
 
-            // 2️⃣ Postman (Socket.IO)
+            // Try Postman/manual testing auth
             if (!token) {
-                console.log("failed", socket.handshake.headers)
                 const authHeader = socket.handshake.headers?.authorization;
                 if (authHeader?.startsWith("Bearer ")) {
                     token = authHeader.split(" ")[1];
@@ -59,62 +41,379 @@ export default function setupGateway(io) {
         }
     });
 
-
-
-
     io.on("connection", (socket) => {
-        console.log("Socket connected:", socket.id);
+        console.log(`✅ Socket connected: ${socket.id} | User: ${socket.user._id}`);
 
-        // socket.on("register", ({ UserId }) => {
-        //     console.log("registered", "asdfasdf")
-        //     sessionManager.addUser(UserId, socket.id);
-        // });
-        console.log(socket.user)
+        // Register user session
         sessionManager.addUser(socket.user._id.toString(), socket.id);
 
+        // ============================================
+        // CHANNEL JOIN/LEAVE
+        // ============================================
 
+        /**
+         * Join a channel room and receive sync data
+         * 
+         * Client sends:
+         * {
+         *   channelId: string,
+         *   lastKnownSequence?: number  // For reconnect/resume
+         * }
+         * 
+         * Server responds with:
+         * - sync_state event with latest message info
+         * - missed_messages event if client was offline
+         */
+        socket.on("join_channel", async ({ channelId, lastKnownSequence = 0 }) => {
+            try {
+                console.log(`📥 join_channel: User ${socket.user._id} joining ${channelId}`);
 
-        // Add Message to the database.
-        socket.on("send_message", async ({ channelId, content }) => {
-            const UserId = socket.user._id;
+                // TODO: Validate user has access to this channel
+                // const hasAccess = await checkChannelAccess(socket.user._id, channelId);
+                // if (!hasAccess) {
+                //     socket.emit("error", { message: "Access denied to this channel" });
+                //     return;
+                // }
 
-            console.log("message received on server:", { channelId, content, UserId });
+                // Join the socket.io room
+                socket.join(channelId);
 
-            const savedMessage = await addMessage({ content, channelId, UserId });
+                // Get sync data (latest message + unread count)
+                const syncData = await messageService.getChannelSyncData(
+                    socket.user._id,
+                    channelId
+                );
 
-            console.log("saved message:", savedMessage);
+                console.log(`📤 Sending sync_state:`, syncData);
 
-            const messageDTO = {
-                id: savedMessage._id.toString(),
-                content: savedMessage.content,
-                senderId: savedMessage.sender.toString(),
-                channelId: savedMessage.channel.toString(),
-                timestamp: savedMessage.createdAt.toISOString()
-            };
-            console.log("emitting to channel:", channelId, "message:", messageDTO);
-            // socket.to(`${channelId}`).emit("new_message", messageDTO);
-            io.to(`${channelId}`).emit("new_message", messageDTO);
+                // Send sync state to client
+                socket.emit("sync_state", {
+                    channelId,
+                    latestMessageId: syncData.latestMessageId,
+                    latestSequence: syncData.latestSequence,
+                    unreadCount: syncData.unreadCount,
+                    lastReadSequence: syncData.lastReadSequence
+                });
 
+                // If client was offline and missed messages, send them
+                if (lastKnownSequence > 0 && lastKnownSequence < syncData.latestSequence) {
+                    const missedMessages = await messageService.getMissedMessages(
+                        channelId,
+                        lastKnownSequence
+                    );
+
+                    console.log(`📤 Sending ${missedMessages.length} missed messages`);
+
+                    socket.emit("missed_messages", {
+                        channelId,
+                        messages: missedMessages.map(msg => formatMessageDTO(msg))
+                    });
+                }
+
+            } catch (error) {
+                console.error("❌ Error in join_channel:", error);
+                socket.emit("error", { message: "Failed to join channel" });
+            }
         });
 
+        /**
+         * Leave a channel room
+         */
+        socket.on("leave_channel", ({ channelId }) => {
+            console.log(`📤 leave_channel: User ${socket.user._id} leaving ${channelId}`);
+            socket.leave(channelId);
 
-        // Join a channel(room, room hopping, socket joining, 
-        // not to be confused with joining a channel in discord.)
-        socket.on("join_channel", async ({ channelId }) => {
-            console.log("channel id", channelId)
-            socket.join(`${channelId}`)
-        })
-
-        socket.on("leaveChannel", ({ channelId }) => {
-            channelManager.leaveActiveChannel(socket, channelId);
+            // Clean up typing indicator
+            if (typingUsers.has(channelId)) {
+                typingUsers.get(channelId).delete(socket.user._id.toString());
+            }
         });
 
+        // ============================================
+        // MESSAGING
+        // ============================================
 
+        /**
+         * Send a message
+         * 
+         * Client sends:
+         * {
+         *   channelId: string,
+         *   content: string,
+         *   clientId?: string  // For optimistic updates
+         * }
+         */
+        socket.on("send_message", async ({ channelId, content, clientId = null }) => {
+    try {
+        const userId = socket.user._id;
 
+        console.log(`📨 send_message: ${userId} -> ${channelId}, clientId: ${clientId}`);
 
+        // Save message to database (with auto-incremented sequence)
+        const savedMessage = await messageService.addMessage({
+            content,
+            channelId,
+            UserId: userId,
+            clientId
+        });
 
+        console.log(`✅ Message saved: seq=${savedMessage.sequence}, id=${savedMessage._id}`);
 
+        // Format message for transmission
+        const messageDTO = formatMessageDTO(savedMessage);
+        console.log(`📋 MessageDTO:`, messageDTO);
 
+        // FIXED: Send echo to sender WITH clientId
+        socket.emit("new_message", messageDTO);
+        console.log(`📤 Sent echo to sender (${socket.id}) WITH clientId: ${clientId}`);
 
+        // FIXED: Broadcast to OTHER users in the room WITHOUT clientId
+        const messageDTOWithoutClientId = {
+            ...messageDTO,
+            clientId: null
+        };
+        
+        // Get all sockets in the room to verify
+        const socketsInRoom = await io.in(channelId).fetchSockets();
+        console.log(`📢 Room ${channelId} has ${socketsInRoom.length} users:`, socketsInRoom.map(s => s.id));
+        
+        socket.to(channelId).emit("new_message", messageDTOWithoutClientId);
+        console.log(`📢 Broadcasted to others in room ${channelId} WITHOUT clientId`);
+
+    } catch (error) {
+        console.error("❌ Error in send_message:", error);
+        socket.emit("error", { 
+            message: "Failed to send message",
+            clientId 
+        });
+    }
+});
+
+        /**
+         * Edit a message
+         * 
+         * Client sends:
+         * {
+         *   messageId: string,
+         *   content: string
+         * }
+         */
+        socket.on("edit_message", async ({ messageId, content }) => {
+            try {
+                const userId = socket.user._id;
+
+                console.log(`✏️ edit_message: ${messageId} by ${userId}`);
+
+                const updatedMessage = await messageService.editMessage(
+                    messageId,
+                    content,
+                    userId
+                );
+
+                const messageDTO = formatMessageDTO(updatedMessage);
+
+                // Broadcast to all users in the channel
+                io.to(updatedMessage.channel.toString()).emit("message_updated", messageDTO);
+
+                console.log(`📢 Broadcasted message_updated: ${messageId}`);
+
+            } catch (error) {
+                console.error("❌ Error in edit_message:", error);
+                socket.emit("error", { message: error.message || "Failed to edit message" });
+            }
+        });
+
+        /**
+         * Delete a message
+         * 
+         * Client sends:
+         * {
+         *   messageId: string
+         * }
+         */
+        socket.on("delete_message", async ({ messageId }) => {
+            try {
+                const userId = socket.user._id;
+
+                console.log(`🗑️ delete_message: ${messageId} by ${userId}`);
+
+                const deletedMessage = await messageService.deleteMessage(messageId, userId);
+
+                const messageDTO = formatMessageDTO(deletedMessage);
+
+                // Broadcast to all users in the channel
+                io.to(deletedMessage.channel.toString()).emit("message_deleted", {
+                    channelId: deletedMessage.channel.toString(),
+                    messageId: deletedMessage._id.toString(),
+                    message: messageDTO
+                });
+
+                console.log(`📢 Broadcasted message_deleted: ${messageId}`);
+
+            } catch (error) {
+                console.error("❌ Error in delete_message:", error);
+                socket.emit("error", { message: error.message || "Failed to delete message" });
+            }
+        });
+
+        // ============================================
+        // TYPING INDICATORS
+        // ============================================
+
+        /**
+         * User started typing
+         * 
+         * Client sends:
+         * {
+         *   channelId: string
+         * }
+         */
+        socket.on("typing_start", ({ channelId }) => {
+            if (!typingUsers.has(channelId)) {
+                typingUsers.set(channelId, new Set());
+            }
+
+            typingUsers.get(channelId).add(socket.user._id.toString());
+
+            // Broadcast to others in channel (NOT including sender)
+            socket.to(channelId).emit("user_typing", {
+                channelId,
+                userId: socket.user._id.toString(),
+                username: socket.user.username
+            });
+
+            console.log(`⌨️ typing_start: ${socket.user.username} in ${channelId}`);
+        });
+
+        /**
+         * User stopped typing
+         */
+        socket.on("typing_stop", ({ channelId }) => {
+            if (typingUsers.has(channelId)) {
+                typingUsers.get(channelId).delete(socket.user._id.toString());
+            }
+
+            socket.to(channelId).emit("user_typing_stop", {
+                channelId,
+                userId: socket.user._id.toString()
+            });
+
+            console.log(`⌨️ typing_stop: ${socket.user.username} in ${channelId}`);
+        });
+
+        // ============================================
+        // READ RECEIPTS
+        // ============================================
+
+        /**
+         * Mark channel as read
+         * 
+         * Client sends:
+         * {
+         *   channelId: string,
+         *   lastReadMessageId?: string
+         * }
+         */
+        socket.on("mark_read", async ({ channelId, lastReadMessageId }) => {
+            try {
+                await messageService.markAsRead(
+                    socket.user._id,
+                    channelId,
+                    lastReadMessageId
+                );
+
+                console.log(`✅ mark_read: ${socket.user._id} in ${channelId}`);
+
+                // Optionally broadcast read receipt to others
+                // socket.to(channelId).emit("user_read", {
+                //     channelId,
+                //     userId: socket.user._id.toString(),
+                //     lastReadMessageId
+                // });
+
+            } catch (error) {
+                console.error("❌ Error in mark_read:", error);
+            }
+        });
+
+        // ============================================
+        // RECONNECT/SYNC
+        // ============================================
+
+        /**
+         * Request sync after reconnect
+         * 
+         * Client sends:
+         * {
+         *   channelId: string,
+         *   lastReceivedSequence: number
+         * }
+         */
+        socket.on("request_sync", async ({ channelId, lastReceivedSequence }) => {
+            try {
+                console.log(`🔄 request_sync: ${channelId} from seq ${lastReceivedSequence}`);
+
+                const missedMessages = await messageService.getMissedMessages(
+                    channelId,
+                    lastReceivedSequence
+                );
+
+                socket.emit("sync_messages", {
+                    channelId,
+                    messages: missedMessages.map(msg => formatMessageDTO(msg))
+                });
+
+                console.log(`📤 Sent ${missedMessages.length} sync messages`);
+
+            } catch (error) {
+                console.error("❌ Error in request_sync:", error);
+                socket.emit("error", { message: "Failed to sync messages" });
+            }
+        });
+
+        // ============================================
+        // DISCONNECT
+        // ============================================
+
+        socket.on("disconnect", () => {
+            console.log(`❌ Socket disconnected: ${socket.id} | User: ${socket.user._id}`);
+
+            // Clean up typing indicators
+            for (const [channelId, users] of typingUsers.entries()) {
+                if (users.has(socket.user._id.toString())) {
+                    users.delete(socket.user._id.toString());
+                    io.to(channelId).emit("user_typing_stop", {
+                        channelId,
+                        userId: socket.user._id.toString()
+                    });
+                }
+            }
+
+            sessionManager.removeUser(socket.user._id.toString());
+        });
     });
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Format message for client transmission
+ */
+function formatMessageDTO(message) {
+    return {
+        id: message._id.toString(),
+        content: message.content,
+        senderId: message.sender._id?.toString() || message.sender.toString(),
+        senderUsername: message.sender.username || null,
+        senderAvatar: message.sender.avatar || null,
+        channelId: message.channel.toString(),
+        sequence: message.sequence,
+        timestamp: message.createdAt.toISOString(),
+        isEdited: message.isEdited,
+        editedAt: message.editedAt?.toISOString() || null,
+        isSystemMessage: message.isSystemMessage || false,
+        clientId: message.clientId || null
+    };
 }

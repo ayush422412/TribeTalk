@@ -1,3 +1,4 @@
+// Models/Channel.model.js (UPDATED)
 import mongoose, { Schema, Types } from "mongoose";
 
 const channelSchema = new Schema(
@@ -34,8 +35,29 @@ const channelSchema = new Schema(
       default: "",
       maxlength: 100,
     },
+
+    // NEW: Counter for message sequences (auto-increment per channel)
+    messageSequence: {
+      type: Number,
+      default: 0,
+    },
+
+    // NEW: Latest message tracking
+    lastMessageId: {
+      type: Types.ObjectId,
+      ref: "Message",
+      default: null,
+    },
+
+    lastMessageAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
+
+// Index for efficient server channel lookup
+channelSchema.index({ server: 1 });
 
 export const Channel = mongoose.model("Channel", channelSchema);

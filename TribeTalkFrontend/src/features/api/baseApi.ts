@@ -1,10 +1,7 @@
-// features/api/baseApi.ts (FIXED - Better error handling)
+// features/api/baseApi.ts (UPDATED)
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query"
 
-/**
- * Custom base query that handles HTML error responses from backend
- */
 const baseQueryWithErrorHandling: BaseQueryFn<
   string | FetchArgs,
   unknown,
@@ -17,21 +14,18 @@ const baseQueryWithErrorHandling: BaseQueryFn<
 
   const result = await baseQuery(args, api, extraOptions)
 
-  // If error and response is HTML (not JSON)
   if (result.error) {
     const error = result.error as any
     
-    // Try to extract error message from HTML response
     if (typeof error.data === 'string' && error.data.includes('<!DOCTYPE html>')) {
       const match = error.data.match(/<pre>(.*?)<\/pre>/s)
       if (match) {
         const errorText = match[1]
           .replace(/<br>/g, '\n')
           .replace(/&nbsp;/g, ' ')
-          .replace(/<[^>]*>/g, '') // Remove HTML tags
+          .replace(/<[^>]*>/g, '')
           .trim()
         
-        // Extract just the error message (first line)
         const firstLine = errorText.split('\n')[0].replace('Error: ', '')
         
         return {
@@ -42,7 +36,6 @@ const baseQueryWithErrorHandling: BaseQueryFn<
         }
       }
       
-      // Fallback if parsing fails
       return {
         error: {
           status: error.status,
@@ -58,6 +51,6 @@ const baseQueryWithErrorHandling: BaseQueryFn<
 export const baseApi = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithErrorHandling,
-  tagTypes: ["Servers", "Channels"],
+  tagTypes: ["Servers", "Channels", "Messages"], // UPDATED: Added Messages
   endpoints: () => ({})
 })

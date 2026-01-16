@@ -1,12 +1,6 @@
-// // gateway/socket.ts
-
-// gateway/socket.ts (FIXED - all IDs are strings now)
-
+// gateway/socket.ts (UPDATED)
 import { io, Socket } from "socket.io-client"
-import type { Channel, Message } from "../features/types"
-
-// Note: Server type removed from import since it's not defined in types.ts
-// If you need it, add it to types.ts
+import type { Channel, Message, SyncState, TypingIndicator } from "../features/types"
 
 class SocketGateway {
   private socket: Socket | null = null
@@ -25,79 +19,112 @@ class SocketGateway {
   }
 
   // ======================
-  // Channel-related events
+  // Channel Events
   // ======================
 
-  joinChannel(channelId: string) {  // FIXED: number → string
+  joinChannel(channelId: string, lastKnownSequence?: number) {
     const socket = this.getSocket()
-    socket.emit("join_channel", { channelId })
+    socket.emit("join_channel", { channelId, lastKnownSequence })
   }
 
-  leaveChannel(channelId: string) {  // FIXED: number → string
+  leaveChannel(channelId: string) {
     const socket = this.getSocket()
     socket.emit("leave_channel", { channelId })
   }
 
   // ======================
-  // Message-related events
+  // Message Events
   // ======================
 
-  sendMessage(payload: { channelId: string; content: string }) {  // FIXED: number → string
+  sendMessage(payload: { channelId: string; content: string; clientId?: string }) {
     const socket = this.getSocket()
     socket.emit("send_message", payload)
   }
 
-  // ======================
-  // Incoming socket events
-  // ======================
-
-  onServers(handler: (servers: any[]) => void) {  // FIXED: Server[] → any[] (Server not in types)
-    this.socket?.on("servers", handler)
+  editMessage(messageId: string, content: string) {
+    const socket = this.getSocket()
+    socket.emit("edit_message", { messageId, content })
   }
 
-  onChannels(
-    handler: (data: { serverId: string; channels: Channel[] }) => void  // FIXED: number → string
-  ) {
-    this.socket?.on("channels", handler)
+  deleteMessage(messageId: string) {
+    const socket = this.getSocket()
+    socket.emit("delete_message", { messageId })
   }
 
-onMessage(handler: (message: Message) => void) {
-  this.socket?.on("new_message", (message: Message) => {
-    console.log("new_message received on client:", message);
-    handler(message);
-  });
-}
+  // ======================
+  // Typing Events
+  // ======================
+
+  startTyping(channelId: string) {
+    const socket = this.getSocket()
+    socket.emit("typing_start", { channelId })
+  }
+
+  stopTyping(channelId: string) {
+    const socket = this.getSocket()
+    socket.emit("typing_stop", { channelId })
+  }
+
+  // ======================
+  // Read Events
+  // ======================
+
+  markAsRead(channelId: string, lastReadMessageId?: string) {
+    const socket = this.getSocket()
+    socket.emit("mark_read", { channelId, lastReadMessageId })
+  }
+
+  // ======================
+  // Sync Events
+  // ======================
+
+  requestSync(channelId: string, lastReceivedSequence: number) {
+    const socket = this.getSocket()
+    socket.emit("request_sync", { channelId, lastReceivedSequence })
+  }
+
+  // ======================
+  // Incoming Events
+  // ======================
+
+  onSyncState(handler: (data: SyncState) => void) {
+    this.socket?.on("sync_state", handler)
+  }
+
+  onMissedMessages(handler: (data: { channelId: string; messages: Message[] }) => void) {
+    this.socket?.on("missed_messages", handler)
+  }
 
   onNewMessage(handler: (message: Message) => void) {
-    this.socket?.on("new_message", (message: Message) => {
-    console.log("new_message received on client:", message);
-    handler(message);
-  });
+    this.socket?.on("new_message", handler)
   }
 
-  onMessageEdited(handler: (message: Message) => void) {
-    this.socket?.on("message_edited", handler)
+  onMessageUpdated(handler: (message: Message) => void) {
+    this.socket?.on("message_updated", handler)
   }
 
-  onMessageDeleted(handler: (data: { channelId: string; messageId: number }) => void) {  // FIXED
+  onMessageDeleted(handler: (data: { channelId: string; messageId: string; message: Message }) => void) {
     this.socket?.on("message_deleted", handler)
   }
 
-  onMessages(handler: (data: { channelId: string; messages: Message[] }) => void) {  // FIXED
-    this.socket?.on("messages", handler)
+  onUserTyping(handler: (data: TypingIndicator) => void) {
+    this.socket?.on("user_typing", handler)
   }
 
-  getMessagesForChannel(channelId: string): Promise<Message[]> {  // FIXED: number → string
-    return new Promise((resolve, reject) => {
-      const socket = this.getSocket()
-      socket.emit("get_messages", { channelId })
-      socket.once(`messages_for_${channelId}`, (messages: Message[]) => resolve(messages))
-      setTimeout(() => reject(new Error("Timeout fetching messages")), 5000)
-    })
+  onUserTypingStop(handler: (data: { channelId: string; userId: string }) => void) {
+    this.socket?.on("user_typing_stop", handler)
+  }
+
+  onSyncMessages(handler: (data: { channelId: string; messages: Message[] }) => void) {
+    this.socket?.on("sync_messages", handler)
+  }
+
+  onError(handler: (data: { message: string; clientId?: string }) => void) {
+    this.socket?.on("error", handler)
   }
 
   // ======================
-  // Connection lifecycle
+  // Connection Events
   // ======================
 
   onConnect(handler: () => void) {
@@ -108,205 +135,17 @@ onMessage(handler: (message: Message) => void) {
     this.socket?.on("disconnect", handler)
   }
 
+  // ======================
+  // Cleanup
+  // ======================
+
   off(event: string, handler?: (...args: any[]) => void) {
     this.socket?.off(event, handler)
+  }
+
+  disconnect() {
+    this.socket?.disconnect()
   }
 }
 
 export const socketGateway = new SocketGateway()
-
-
-// import { io, Socket } from "socket.io-client"
-// import type { Channel, ServerFull, Message } from "../features/types"
-
-// /**
-//  * SocketGateway
-//  *
-//  * This class is the single source of truth for:
-//  * - Socket.io connection
-//  * - Emitting domain-specific socket events
-//  * - Registering socket listeners
-//  *
-//  * The rest of the app should NEVER:
-//  * - call socket.emit directly
-//  * - use raw event strings
-//  */
-// class SocketGateway {
-//   /**
-//    * Holds the active socket.io connection.
-//    * It is null until connect() is called.
-//    */
-//   private socket: Socket | null = null
-
-//   /**
-//    * Establishes a socket.io connection with the backend.
-//    * Called once during app bootstrap (after auth).
-//    */
-//   connect(token: string) {
-//     console.log("SocketGateway: Connecting socket with token:", token)
-//     this.socket = io("http://localhost:3000", {
-//       auth: { token }
-//     })
-//   }
-
-//   /**
-//    * Ensures the socket is connected before emitting events.
-//    * Helps catch bugs early during development.
-//    */
-//   private getSocket(): Socket {
-//     if (!this.socket) {
-//       throw new Error("Socket not connected")
-//     }
-//     return this.socket
-//   }
-
-
-
-//   // ======================
-//   // Channel-related events
-//   // ======================
-
-//   /**
-//    * Requests the backend to join a channel.
-//    * Backend will:
-//    * - validate permissions
-//    * - join the socket to the channel room
-//    */
-//   joinChannel(channelId: number) {
-//     const socket = this.getSocket()
-//     socket.emit("join_channel", { channelId })
-//   }
-
-//   /**
-//    * Requests the backend to leave a channel.
-//    * Used when switching channels or servers.
-//    */
-//   leaveChannel(channelId: number) {
-//     const socket = this.getSocket()
-//     socket.emit("leave_channel", { channelId })
-
-//   }
-
-//   // ======================
-//   // Message-related events
-//   // ======================
-
-//   /**
-//    * Sends a message to a channel.
-//    * The backend will:
-//    * - validate channel access
-//    * - verify room membership
-//    * - persist the message
-//    * - broadcast it to the channel room
-//    */
-//   sendMessage(payload: { channelId: number; content: string }) {
-//     console.log("SocketGateway: Sending message", payload)
-//     const socket = this.getSocket()
-//     socket.emit("send_message", payload)
-
-//   }
-
-//   // ======================
-//   // Incoming socket events
-//   // ======================
-
-//   /**
-//    * Listens for the list of servers the user belongs to.
-//    * Usually sent after connecting or re-authenticating.
-//    */
-//   // onServers(handler: (servers: Server[]) => void) {
-//   //   this.socket?.on("servers", handler)
-//   // }
-
-//   /**
-//    * Listens for channels belonging to a server.
-//    * Used when switching servers or on initial load.
-//    */
-//   onChannels(
-//     handler: (data: { serverId: number; channels: Channel[] }) => void
-//   ) {
-//     this.socket?.on("channels", handler)
-//   }
-
-//   /**
-//    * Listens for new messages in the active channel.
-//    * Fired when any user sends a message to the channel.
-//    */
-//   onMessage(handler: (message: Message) => void) {
-//     this.socket?.on("new_message", handler)
-//   }
-
-
-//   /**
-//  * Registers a listener for new messages
-//  */
-// onNewMessage(handler: (message: Message) => void) {
-//   this.socket?.on("new_message", handler)
-// }
-
-// /**
-//  * Registers a listener for edited messages
-//  */
-// onMessageEdited(handler: (message: Message) => void) {
-//   this.socket?.on("message_edited", handler)
-// }
-
-// /**
-//  * Registers a listener for deleted messages
-//  */
-// onMessageDeleted(handler: (data: { channelId: number; messageId: number }) => void) {
-//   this.socket?.on("message_deleted", handler)
-// }
-// /**
-//  * Registers a listener for bulk messages for a channel
-//  */
-// onMessages(handler: (data: { channelId: number; messages: Message[] }) => void) {
-//   this.socket?.on("messages", handler)
-// }
-// /**
-//  * Requests messages for a specific channel
-//  * Returns a one-time listener promise
-//  */
-// getMessagesForChannel(channelId: number): Promise<Message[]> {
-//   return new Promise((resolve, reject) => {
-//     const socket = this.getSocket()
-//     socket.emit("get_messages", { channelId })
-//     socket.once(`messages_for_${channelId}`, (messages: Message[]) => resolve(messages))
-//     setTimeout(() => reject(new Error("Timeout fetching messages")), 5000)
-//   })}
-
-//   // ======================
-//   // Connection lifecycle
-//   // ======================
-
-//   /**
-//    * Fired when the socket successfully connects.
-//    * Useful for resyncing state.
-//    */
-//   onConnect(handler: () => void) {
-//     this.socket?.on("connect", handler)
-//   }
-
-//   /**
-//    * Fired when the socket disconnects.
-//    * Useful for showing offline UI.
-//    */
-//   onDisconnect(handler: () => void) {
-//     this.socket?.on("disconnect", handler)
-//   }
-
-//   /**
-//    * Removes socket listeners.
-//    * Critical to prevent memory leaks and duplicated events.
-//    */
-//   off(event: string, handler?: (...args: any[]) => void) {
-//     this.socket?.off(event, handler)
-//   }
-  
-// }
-
-// /**
-//  * Singleton instance used throughout the app.
-//  * There should only ever be ONE socket connection.
-//  */
-// export const socketGateway = new SocketGateway()
