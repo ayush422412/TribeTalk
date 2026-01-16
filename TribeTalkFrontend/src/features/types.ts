@@ -1,11 +1,11 @@
-// types.ts (FIXED - all IDs are now strings)
+// features/types.ts (UPDATED)
 
 export interface Channel {
   _id: string
   name: string
   type: "text" | "voice"
   description?: string
-  server: string | ServerSummary  // string when creating, full object when fetching
+  server: string | ServerSummary
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -14,10 +14,10 @@ export interface Channel {
 
 export interface ChannelState {
   channelsByServer: Record<string, Channel[]>
-  activeChannelId: string | null  // FIXED: was number, now string
+  activeChannelId: string | null
 }
 
-export type ServerRole = "owner" | "moderator" | "member" 
+export type ServerRole = "owner" | "moderator" | "member"
 
 export interface ServerSummary {
   _id: string
@@ -32,14 +32,43 @@ export interface ServerFull extends ServerSummary {
   channels: Channel[]
 }
 
+// UPDATED: Complete message type with all backend fields
 export interface Message {
-  id: number
+  id: string                    // MongoDB _id
   content: string
-  senderId: number
-  channelId: string  // FIXED: was number, now string to match Channel._id
-  timestamp?: string
+  senderId: string
+  senderUsername?: string       // From populated sender
+  senderAvatar?: string         // From populated sender
+  channelId: string
+  sequence: number              // For ordering
+  timestamp: string             // ISO string
+  isEdited: boolean
+  editedAt?: string             // ISO string
+  isSystemMessage?: boolean
+  clientId?: string             // For optimistic updates
+  deletedAt?: string            // For soft deletes
+  isPending?: boolean           // Local-only flag for optimistic updates
+  isFailed?: boolean            // Local-only flag for failed sends
 }
 
 export interface MessageState {
-  messagesByChannel: Record<string, Message[]>  // FIXED: was number, now string
+  messagesByChannel: Record<string, Message[]>
+  editingMessageId: string | null  // Track which message is being edited
+  typingUsers: Record<string, string[]>  // channelId -> userIds[]
+}
+
+// NEW: Typing indicator data
+export interface TypingIndicator {
+  channelId: string
+  userId: string
+  username: string
+}
+
+// NEW: Sync state from backend
+export interface SyncState {
+  channelId: string
+  latestMessageId: string | null
+  latestSequence: number
+  unreadCount: number
+  lastReadSequence: number
 }

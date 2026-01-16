@@ -1,3 +1,4 @@
+// Models/Message.model.js (UPDATED)
 import mongoose, { Schema, Types } from "mongoose";
 
 const messageSchema = new Schema(
@@ -15,20 +16,56 @@ const messageSchema = new Schema(
       required: true,
     },
 
-
     channel: {
       type: Types.ObjectId,
       ref: "Channel",
-      default: null,
+      required: true,
+    },
+
+    // NEW: Sequence number for strict ordering within a channel
+    sequence: {
+      type: Number,
+      required: true,
+      index: true,
     },
 
     isEdited: {
       type: Boolean,
       default: false,
     },
+
+    // NEW: Track when message was edited
+    editedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // NEW: Soft delete support
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // NEW: System messages (user joined, etc.)
+    isSystemMessage: {
+      type: Boolean,
+      default: false,
+    },
+
+    // NEW: For optimistic updates - client can send a temp ID
+    clientId: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
-export const Message = mongoose.model("Message", messageSchema);
+// Compound index for efficient cursor-based pagination
+messageSchema.index({ channel: 1, sequence: -1 });
+messageSchema.index({ channel: 1, createdAt: -1 });
 
+// Index for finding messages by ID within a channel (for "after" queries)
+messageSchema.index({ channel: 1, _id: 1 });
+
+export const Message = mongoose.model("Message", messageSchema);
