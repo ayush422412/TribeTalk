@@ -57,6 +57,8 @@ const deleteServer = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, null, "Server deleted successfully"));
 });
 
+
+
 const listServers = asyncHandler(async (req, res) => {
     const userId = req.user._id;
 
@@ -90,6 +92,7 @@ const listServers = asyncHandler(async (req, res) => {
 
     return res.status(200).json(new ApiResponse(200, serversWithRole, "Servers fetched successfully"));
 });
+
 
 
 const editServer = asyncHandler(async (req, res) => {
@@ -179,7 +182,6 @@ const getServerInfo = asyncHandler(async (req, res) => {
         channels // include channels array
     }, "Server info fetched successfully"));
 });
-
 
 
 

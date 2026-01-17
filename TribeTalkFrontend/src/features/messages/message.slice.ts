@@ -18,16 +18,16 @@ const messageSlice = createSlice({
     /**
      * Set messages for a channel (from REST API or initial sync)
      */
-    setMessagesForChannel(
-      state,
-      action: PayloadAction<{ channelId: string; messages: Message[] }>
-    ) {
-      const { channelId, messages } = action.payload
-      state.messagesByChannel[channelId] = messages
-        .sort((a, b) => a.sequence - b.sequence)
-        .slice(-MAX_MESSAGES_PER_CHANNEL)
-    },
+setMessagesForChannel(
+  state,
+  action: PayloadAction<{ channelId: string; messages: Message[] }>
+) {
+  const { channelId, messages } = action.payload
 
+  state.messagesByChannel[channelId] = [...messages]
+    .sort((a, b) => a.sequence - b.sequence)
+    .slice(-MAX_MESSAGES_PER_CHANNEL)
+},
     /**
      * Prepend older messages (for infinite scroll up)
      */
