@@ -143,42 +143,45 @@ export default function setupGateway(io) {
          *   clientId?: string  // For optimistic updates
          * }
          */
-        socket.on("send_message", async ({ channelId, content, clientId = null }) => {
+    socket.on("send_message", async ({ channelId, content, clientId = null }) => {
     try {
-        const userId = socket.user._id;
+        const user = socket.user; // ✅ FULL USER OBJECT
 
-        console.log(`📨 send_message: ${userId} -> ${channelId}, clientId: ${clientId}`);
+        console.log(`📨 send_message: ${user._id} -> ${channelId}, clientId: ${clientId}`);
 
-        // Save message to database (with auto-incremented sequence)
+        // Save message
         const savedMessage = await messageService.addMessage({
             content,
             channelId,
-            UserId: userId,
+            UserId: user._id,
             clientId
         });
 
         console.log(`✅ Message saved: seq=${savedMessage.sequence}, id=${savedMessage._id}`);
 
-        // Format message for transmission
-        const messageDTO = formatMessageDTO(savedMessage);
+        // 🔥 CRITICAL FIX: attach user BEFORE DTO
+        const messageWithUser = {
+            ...savedMessage.toObject(),
+            user: {
+                _id: user._id,
+                username: user.username
+            }
+        };
+
+        const messageDTO = formatMessageDTO(messageWithUser);
         console.log(`📋 MessageDTO:`, messageDTO);
 
-        // FIXED: Send echo to sender WITH clientId
+        // Echo to sender WITH clientId
         socket.emit("new_message", messageDTO);
         console.log(`📤 Sent echo to sender (${socket.id}) WITH clientId: ${clientId}`);
 
-        // FIXED: Broadcast to OTHER users in the room WITHOUT clientId
-        const messageDTOWithoutClientId = {
+        // Broadcast to others WITHOUT clientId
+        socket.to(channelId).emit("new_message", {
             ...messageDTO,
             clientId: null
-        };
-        
-        // Get all sockets in the room to verify
-        const socketsInRoom = await io.in(channelId).fetchSockets();
-        console.log(`📢 Room ${channelId} has ${socketsInRoom.length} users:`, socketsInRoom.map(s => s.id));
-        
-        socket.to(channelId).emit("new_message", messageDTOWithoutClientId);
-        console.log(`📢 Broadcasted to others in room ${channelId} WITHOUT clientId`);
+        });
+
+        console.log(`📢 Broadcasted to others in room ${channelId}`);
 
     } catch (error) {
         console.error("❌ Error in send_message:", error);
@@ -188,6 +191,7 @@ export default function setupGateway(io) {
         });
     }
 });
+
 
         /**
          * Edit a message
@@ -402,16 +406,33 @@ export default function setupGateway(io) {
  * Format message for client transmission
  */
 function formatMessageDTO(message) {
+    // Normalize sender (works for realtime + DB + fallback)
+    const sender =
+        message.user ||          // realtime (socket.user)
+        message.UserId ||        // populated DB
+        null;
+
     return {
         id: message._id.toString(),
         content: message.content,
-        senderId: message.sender._id?.toString() || message.sender.toString(),
-        senderUsername: message.sender.username || null,
-        senderAvatar: message.sender.avatar || null,
-        channelId: message.channel.toString(),
+
+        senderId:
+            sender?._id?.toString() ||
+            (typeof sender === "string" ? sender : null),
+
+        senderUsername:
+            sender?.username || null,
+
+        senderAvatar:
+            sender?.avatar || null,
+
+        channelId:
+            message.channelId?.toString?.() ||
+            message.channel?.toString(),
+
         sequence: message.sequence,
         timestamp: message.createdAt.toISOString(),
-        isEdited: message.isEdited,
+        isEdited: message.isEdited || false,
         editedAt: message.editedAt?.toISOString() || null,
         isSystemMessage: message.isSystemMessage || false,
         clientId: message.clientId || null
