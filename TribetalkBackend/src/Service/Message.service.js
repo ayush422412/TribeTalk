@@ -136,7 +136,6 @@ export const getUnreadCountsForUser=async (userId) => {
   return unreadCounts;
 };
 
-
 /**
  * Get read state for a user in a channel
  */

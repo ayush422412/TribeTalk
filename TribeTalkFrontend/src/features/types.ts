@@ -15,6 +15,7 @@ export interface Channel {
 export interface ChannelState {
   channelsByServer: Record<string, Channel[]>
   activeChannelId: string | null
+  unreadCounts:Record<string, number>
 }
 
 export type ServerRole = "owner" | "moderator" | "member"

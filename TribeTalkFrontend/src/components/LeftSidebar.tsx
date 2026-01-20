@@ -1,15 +1,29 @@
 // LeftSidebar.tsx
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useServer } from "../hooks/useServer"
 import { useChannel } from "../hooks/useChannel"
 import CreateServerModal from "./CreateServerModal"
 import CreateChannelModal from "./CreateChannelModal"
+import { useSelector } from "react-redux";
+import type { RootState } from "../app/store"; // adjust path to your store
+import { socketGateway } from "../gateway/socket"
+
+
 
 const LeftSidebar = () => {
   const { servers, activeServerId, selectServer, isLoading: serversLoading } = useServer()
   const { channels, selectChannel, isLoading: channelsLoading, refetchChannels } = useChannel(activeServerId)
   const [isServerModalOpen, setIsServerModalOpen] = useState(false)
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false)
+  const unreadCounts = useSelector((state: RootState) => state.channel.unreadCounts)
+
+
+  console.log("inreadcounsssssssss",unreadCounts)
+
+
+  
+
+
 
   return (
     <div className="w-64 h-screen bg-gray-800 text-white p-4">
@@ -22,10 +36,12 @@ const LeftSidebar = () => {
         {servers.map((server) => (
           <button
             key={server._id}
-            onClick={() => selectServer(server._id)}
-            className={`block w-full text-left p-2 rounded ${
-              activeServerId === server._id ? "bg-gray-700" : ""
-            }`}
+            onClick={() => {selectServer(server._id);socketGateway.getUnreadCounts()}
+              
+            }
+            
+            className={`block w-full text-left p-2 rounded ${activeServerId === server._id ? "bg-gray-700" : ""
+              }`}
           >
             {server.name}
           </button>
@@ -48,9 +64,14 @@ const LeftSidebar = () => {
             <button
               key={channel._id}
               onClick={() => selectChannel(channel._id)}
-              className="block w-full text-left p-2 hover:bg-gray-700"
+              className="flex justify-between w-full text-left p-2 hover:bg-gray-700"
             >
-              #{channel.name}
+              <span>#{channel.name}</span>
+              {unreadCounts[channel._id] > 0 && (
+                <span className="ml-2 text-xs bg-red-600 px-2 rounded-full">
+                  {unreadCounts[channel._id]}
+                </span>
+              )}
             </button>
           ))
         )}

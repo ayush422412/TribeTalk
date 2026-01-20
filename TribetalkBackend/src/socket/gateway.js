@@ -329,7 +329,7 @@ export default function setupGateway(io) {
          */
         socket.on("get_unread_counts",async() => {
             const unread_counts=await messageService.getUnreadCountsForUser(socket.user._id)
-            console.log(unread_counts)
+            console.log( "unreadcounts",unread_counts)
             socket.emit("unread_counts",unread_counts)
             
 
