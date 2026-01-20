@@ -6,6 +6,7 @@ import type { AppDispatch } from "./app/store"
 import { initializeMessageSync, cleanupMessageSync } from "./features/messages/socketMessageSync"
 import { socketGateway } from "./gateway/socket"
 
+
 // pages
 import Login from "./pages/Login"
 import Register from "./pages/Register"
@@ -23,6 +24,8 @@ function App() {
       // Connect socket
       console.log("Connecting socket with token:", token)
       socketGateway.connect(token)
+
+
 
       // Initialize message sync (socket listeners)
       initializeMessageSync(dispatch)

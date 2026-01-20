@@ -74,6 +74,15 @@ class SocketGateway {
     socket.emit("mark_read", { channelId, lastReadMessageId })
   }
 
+  getUnreadCounts() {
+    const socket = this.getSocket()
+    console.log("get unread count called")
+    socket.emit("get_unread_counts", )
+    
+  }
+
+
+
   // ======================
   // Sync Events
   // ======================
@@ -122,6 +131,13 @@ class SocketGateway {
   onError(handler: (data: { message: string; clientId?: string }) => void) {
     this.socket?.on("error", handler)
   }
+onUnreadCounts(handler: (data: { [channelId: string]: number }) => void) {
+  this.socket?.on("unread_counts", (data) => {
+    console.log("Unread counts received:", data);
+    handler(data);
+  });
+}
+
 
   // ======================
   // Connection Events
@@ -143,6 +159,12 @@ class SocketGateway {
     this.socket?.off(event, handler)
   }
 
+  offUnreadCounts(handler: (data: {[channelId : string]:number}) => void) {
+    this.socket?.off("unread_counts", handler)
+  }
+
+
+  
   disconnect() {
     this.socket?.disconnect()
   }
