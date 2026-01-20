@@ -4,6 +4,8 @@ import { useSelector } from "react-redux"
 import type { RootState } from "../app/store"
 import { useMessages } from "../hooks/useMessages"
 import { useChannelSync } from "../hooks/useChannelSync"
+import { useReadState } from "../hooks/useReadState"
+import { useIntersectionObserver } from "../hooks/useIntersectionObserver"
 import { useAuth } from "../features/auth/useAuth"
 import type { Message } from "../features/types"
 
@@ -14,7 +16,6 @@ const RightContent = () => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const scrollPositionRef = useRef<number>(0)
 
   const { user } = useAuth()
   const activeChannelId = useSelector(
@@ -38,37 +39,45 @@ const RightContent = () => {
     loadOlderMessages,
   } = useMessages(activeChannelId)
 
-  // Auto-scroll to bottom when new messages arrive (but not when loading older)
+  // Track if messages container is visible in viewport
+  const { elementRef: visibilityRef, isVisible } = useIntersectionObserver({
+    threshold: 0.1,
+  })
+
+  // Mark messages as read automatically
+  const { markAsRead } = useReadState({
+    channelId: activeChannelId,
+    messages,
+    isVisible,
+  })
+
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (messagesContainerRef.current) {
       const container = messagesContainerRef.current
       const isScrolledToBottom =
         container.scrollHeight - container.scrollTop <= container.clientHeight + 100
 
-      // Only auto-scroll if user is near bottom
       if (isScrolledToBottom) {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
       }
     }
   }, [messages])
 
-  // Handle scroll for infinite scroll (load older messages)
+  // Handle scroll for infinite scroll
   const handleScroll = async () => {
     const container = messagesContainerRef.current
     if (!container || isLoadingOlder) return
 
-    // If scrolled to top, load older messages
     if (container.scrollTop === 0 && messages.length > 0) {
       setIsLoadingOlder(true)
       
-      // Save current scroll position
       const oldScrollHeight = container.scrollHeight
       
       const result = await loadOlderMessages()
       
       setIsLoadingOlder(false)
 
-      // Restore scroll position after prepending messages
       if (result && result.count > 0) {
         setTimeout(() => {
           const newScrollHeight = container.scrollHeight
@@ -85,6 +94,9 @@ const RightContent = () => {
 
     sendMessage(messageInput.trim())
     setMessageInput("")
+    
+    // Mark channel as read after sending (you've seen everything up to your message)
+    markAsRead()
   }
 
   // Handle edit message
@@ -133,6 +145,9 @@ const RightContent = () => {
             Loading older messages...
           </div>
         )}
+
+        {/* Visibility tracker (for read state) */}
+        <div ref={visibilityRef} className="h-0" />
 
         {/* Messages */}
         {messages.length === 0 ? (
@@ -219,7 +234,6 @@ const MessageItem = ({
 }: MessageItemProps) => {
   const [showActions, setShowActions] = useState(false)
 
-  // Format timestamp
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp)
     return date.toLocaleTimeString("en-US", {
@@ -229,7 +243,6 @@ const MessageItem = ({
     })
   }
 
-  // If message is being edited
   if (isEditing) {
     return (
       <div className="bg-gray-800 p-3 rounded border-2 border-blue-500">
@@ -268,7 +281,6 @@ const MessageItem = ({
     )
   }
 
-  // Normal message display
   return (
     <div
       className={`bg-gray-800 p-3 rounded relative ${
@@ -299,7 +311,6 @@ const MessageItem = ({
         {message.content}
       </p>
 
-      {/* Action Buttons (only show on hover for own messages) */}
       {showActions && isOwn && !message.deletedAt && !message.isPending && (
         <div className="absolute top-2 right-2 flex gap-1">
           <button
