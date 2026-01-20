@@ -118,6 +118,25 @@ export const getUnreadCount = async (userId, channelId) => {
   return messageRepo.countUnreadMessages(channelId, lastReadSequence);
 };
 
+
+export const getUnreadCountsForUser=async (userId) => {
+  const readStates = await ReadState.find({ user: userId});
+  // const lastReadSequence = readState?.lastReadSequence || 0;
+  console.log("readState",readStates)
+  const unreadCounts={}
+  for(const readState of readStates){
+    const channelId=readState.channel._id
+    const lastReadSequence=readState?.lastReadSequence || 0;
+    const count=await messageRepo.countUnreadMessages(channelId, lastReadSequence)
+    unreadCounts[channelId]=count
+
+  }
+  console.log("unreadcounts",unreadCounts)
+
+  return unreadCounts;
+};
+
+
 /**
  * Get read state for a user in a channel
  */

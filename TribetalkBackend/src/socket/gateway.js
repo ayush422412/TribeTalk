@@ -79,6 +79,7 @@ export default function setupGateway(io) {
                 socket.join(channelId);
 
                 // Get sync data (latest message + unread count)
+
                 const syncData = await messageService.getChannelSyncData(
                     socket.user._id,
                     channelId
@@ -94,6 +95,8 @@ export default function setupGateway(io) {
                     unreadCount: syncData.unreadCount,
                     lastReadSequence: syncData.lastReadSequence
                 });
+
+                console.log("current sequrce", lastKnownSequence, channelId)
 
                 // If client was offline and missed messages, send them
                 if (lastKnownSequence > 0 && lastKnownSequence < syncData.latestSequence) {
@@ -143,54 +146,55 @@ export default function setupGateway(io) {
          *   clientId?: string  // For optimistic updates
          * }
          */
-    socket.on("send_message", async ({ channelId, content, clientId = null }) => {
-    try {
-        const user = socket.user; // ✅ FULL USER OBJECT
+        socket.on("send_message", async ({ channelId, content, clientId = null }) => {
+            try {
+                const user = socket.user; // ✅ FULL USER OBJECT
 
-        console.log(`📨 send_message: ${user._id} -> ${channelId}, clientId: ${clientId}`);
+                console.log(`📨 send_message: ${user._id} -> ${channelId}, clientId: ${clientId}`);
 
-        // Save message
-        const savedMessage = await messageService.addMessage({
-            content,
-            channelId,
-            UserId: user._id,
-            clientId
-        });
 
-        console.log(`✅ Message saved: seq=${savedMessage.sequence}, id=${savedMessage._id}`);
+                // Save message
+                const savedMessage = await messageService.addMessage({
+                    content,
+                    channelId,
+                    UserId: user._id,
+                    clientId
+                });
 
-        // 🔥 CRITICAL FIX: attach user BEFORE DTO
-        const messageWithUser = {
-            ...savedMessage.toObject(),
-            user: {
-                _id: user._id,
-                username: user.username
+                console.log(`✅ Message saved: seq=${savedMessage.sequence}, id=${savedMessage._id}`);
+
+                // 🔥 CRITICAL FIX: attach user BEFORE DTO
+                const messageWithUser = {
+                    ...savedMessage.toObject(),
+                    user: {
+                        _id: user._id,
+                        username: user.username
+                    }
+                };
+
+                const messageDTO = formatMessageDTO(messageWithUser);
+                console.log(`📋 MessageDTO:`, messageDTO);
+
+                // Echo to sender WITH clientId
+                socket.emit("new_message", messageDTO);
+                console.log(`📤 Sent echo to sender (${socket.id}) WITH clientId: ${clientId}`);
+
+                // Broadcast to others WITHOUT clientId
+                socket.to(channelId).emit("new_message", {
+                    ...messageDTO,
+                    clientId: null
+                });
+
+                console.log(`📢 Broadcasted to others in room ${channelId}`);
+
+            } catch (error) {
+                console.error("❌ Error in send_message:", error);
+                socket.emit("error", {
+                    message: "Failed to send message",
+                    clientId
+                });
             }
-        };
-
-        const messageDTO = formatMessageDTO(messageWithUser);
-        console.log(`📋 MessageDTO:`, messageDTO);
-
-        // Echo to sender WITH clientId
-        socket.emit("new_message", messageDTO);
-        console.log(`📤 Sent echo to sender (${socket.id}) WITH clientId: ${clientId}`);
-
-        // Broadcast to others WITHOUT clientId
-        socket.to(channelId).emit("new_message", {
-            ...messageDTO,
-            clientId: null
         });
-
-        console.log(`📢 Broadcasted to others in room ${channelId}`);
-
-    } catch (error) {
-        console.error("❌ Error in send_message:", error);
-        socket.emit("error", { 
-            message: "Failed to send message",
-            clientId 
-        });
-    }
-});
 
 
         /**
@@ -260,6 +264,8 @@ export default function setupGateway(io) {
             }
         });
 
+
+
         // ============================================
         // TYPING INDICATORS
         // ============================================
@@ -304,6 +310,36 @@ export default function setupGateway(io) {
 
             console.log(`⌨️ typing_stop: ${socket.user.username} in ${channelId}`);
         });
+
+
+
+        // ============================================
+        // MESSAGING
+        // ============================================
+
+        /**
+         * Send a message
+         * 
+         * Client sends:
+         * {
+         *   channelId: string,
+         *   content: string,
+         *   clientId?: string  // For optimistic updates
+         * }
+         */
+        socket.on("get_unread_counts",async() => {
+            const unread_counts=await messageService.getUnreadCountsForUser(socket.user._id)
+            console.log(unread_counts)
+            socket.emit("unread_counts",unread_counts)
+            
+
+          
+        }
+        )
+
+
+
+
 
         // ============================================
         // READ RECEIPTS
@@ -397,6 +433,9 @@ export default function setupGateway(io) {
         });
     });
 }
+
+
+
 
 // ============================================
 // HELPER FUNCTIONS
