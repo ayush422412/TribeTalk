@@ -34,7 +34,10 @@ export function useChannel(serverId: string | null) {
     dispatch(setUnreadCount(data))
   }
   const incrementUnreadCount = (data: {channelId: string} ) => {
+  
+    
     dispatch(incrementUnreadCountForChannel(data))
+    
     
   }
 

@@ -4,6 +4,7 @@ import type { PayloadAction } from "@reduxjs/toolkit"
 import type { Channel, ChannelState } from '../types'
 import { sampleChannelsByServer } from "../sampleData"
 
+
 // uncomment this code to use actual data instead of filler
 // const initialState: ChannelState = {
 //   channelsByServer: {},
@@ -39,8 +40,11 @@ const channelSlice = createSlice({
     }
     },
     incrementUnreadCountForChannel(state, action: PayloadAction<{channelId: string} >) {  // FIXED: number → string
-  const {channelId} =action.payload
-    state.unreadCounts[channelId]=(state.unreadCounts[channelId]??0)+1
+    const {channelId} =action.payload
+    console.log("called from slice .ts",channelId,state.activeChannelId)
+    if(channelId!=state.activeChannelId){
+      state.unreadCounts[channelId]=(state.unreadCounts[channelId]??0)+1
+    }
     },
     
     // NEW: Add a single channel to a server (for optimistic updates)

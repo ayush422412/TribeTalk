@@ -16,6 +16,9 @@ const LeftSidebar = () => {
   const [isServerModalOpen, setIsServerModalOpen] = useState(false)
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false)
   const unreadCounts = useSelector((state: RootState) => state.channel.unreadCounts)
+  // const activeChannelId = useSelector(
+  //     (state: RootState) => state.channel.activeChannelId
+  //   )
 
 
   console.log("inreadcounsssssssss",unreadCounts)
@@ -68,7 +71,7 @@ const LeftSidebar = () => {
               className="flex justify-between w-full text-left p-2 hover:bg-gray-700"
             >
               <span>#{channel.name}</span>
-              {unreadCounts[channel._id] > 0 && (
+              {unreadCounts[channel._id] > 0 &&  (
                 <span className="ml-2 text-xs bg-red-600 px-2 rounded-full">
                   {unreadCounts[channel._id]}
                 </span>
