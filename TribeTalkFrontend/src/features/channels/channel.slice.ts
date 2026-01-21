@@ -5,6 +5,7 @@ import type { Channel, ChannelState } from '../types'
 import { sampleChannelsByServer } from "../sampleData"
 
 
+
 // uncomment this code to use actual data instead of filler
 // const initialState: ChannelState = {
 //   channelsByServer: {},
@@ -32,8 +33,18 @@ const channelSlice = createSlice({
     
     setActiveChannel(state, action: PayloadAction<string>) {  // FIXED: number → string
       state.activeChannelId = action.payload
+      if(state.unreadCounts[state.activeChannelId]!==undefined){
+        state.unreadCounts[state.activeChannelId]=0
+        
+
+      }
+      
+
     },
-    setUnreadCount(state, action: PayloadAction<{ [channelId: string] : number }>) {  // FIXED: number → string
+    setUnreadCount(state, action: PayloadAction<{ [channelId: string] : number }>) { 
+      
+      // FIXED: number → string
+      
     state.unreadCounts={
       ...state.unreadCounts,
       ...action.payload
@@ -46,6 +57,7 @@ const channelSlice = createSlice({
       state.unreadCounts[channelId]=(state.unreadCounts[channelId]??0)+1
     }
     },
+    
     
     // NEW: Add a single channel to a server (for optimistic updates)
     addChannelToServer(
