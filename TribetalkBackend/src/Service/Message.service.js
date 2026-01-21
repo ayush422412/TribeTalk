@@ -117,6 +117,7 @@ export const getUnreadCount = async (userId, channelId) => {
 
   return messageRepo.countUnreadMessages(channelId, lastReadSequence);
 };
+//GET UNREAD COUNTS OF OFF CHANNEL INA SERVER
 
 
 export const getUnreadCountsForUser=async (userId) => {

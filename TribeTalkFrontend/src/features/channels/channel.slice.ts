@@ -38,6 +38,10 @@ const channelSlice = createSlice({
       ...action.payload
     }
     },
+    incrementUnreadCountForChannel(state, action: PayloadAction<{channelId: string} >) {  // FIXED: number → string
+  const {channelId} =action.payload
+    state.unreadCounts[channelId]=(state.unreadCounts[channelId]??0)+1
+    },
     
     // NEW: Add a single channel to a server (for optimistic updates)
     addChannelToServer(
@@ -53,6 +57,6 @@ const channelSlice = createSlice({
   }
 })
 
-export const { setChannelsForServer, setActiveChannel, addChannelToServer,setUnreadCount } =
+export const { setChannelsForServer, setActiveChannel, addChannelToServer,setUnreadCount,incrementUnreadCountForChannel } =
   channelSlice.actions
 export default channelSlice.reducer
