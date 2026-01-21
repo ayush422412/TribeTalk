@@ -5,6 +5,7 @@ import { useDispatch } from "react-redux"
 import type { AppDispatch } from "./app/store"
 import { initializeMessageSync, cleanupMessageSync } from "./features/messages/socketMessageSync"
 import { socketGateway } from "./gateway/socket"
+import JoinServerRedirect from "./components/JoinServerRedirect"
 
 
 // pages
@@ -46,6 +47,12 @@ function App() {
           isLoggedIn ? <Navigate to="/home" replace /> : <Login />
         }
       />
+
+      <Route
+        path="/server/join-server/:id"
+        element={<JoinServerRedirect />}
+      />
+
 
       <Route
         path="/register"

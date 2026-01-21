@@ -7,6 +7,7 @@ import CreateChannelModal from "./CreateChannelModal"
 import { useSelector } from "react-redux";
 import type { RootState } from "../app/store"; // adjust path to your store
 import { socketGateway } from "../gateway/socket"
+import {copyToClipboard} from "../utils/commonTools"
 
 
 
@@ -16,12 +17,14 @@ const LeftSidebar = () => {
   const [isServerModalOpen, setIsServerModalOpen] = useState(false)
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false)
   const unreadCounts = useSelector((state: RootState) => state.channel.unreadCounts)
+  const baseUrl="http://localhost:5173/server/join-server/"
   // const activeChannelId = useSelector(
   //     (state: RootState) => state.channel.activeChannelId
   //   )
 
 
   console.log("inreadcounsssssssss",unreadCounts)
+  console.log(activeServerId)
 
 
 
@@ -31,7 +34,25 @@ const LeftSidebar = () => {
 
   return (
     <div className="w-64 h-screen bg-gray-800 text-white p-4">
-      <h1 className="text-xl font-bold mb-6">My App</h1>
+      <div className="flex gap-2 justify-evenly">
+        <h1 className="text-xl font-bold mb-6">My App</h1>
+      <button onClick={()=>copyToClipboard(baseUrl+activeServerId)}
+      className="
+        flex items-center gap-2 
+        bg-blue-600 hover:bg-blue-700
+        text-white font-medium
+        px-4 py-1
+        rounded-lg
+        shadow-md hover:shadow-lg
+        transition-all duration-200
+        active:scale-95
+        focus:outline-none focus:ring-2 focus:ring-blue-400
+      "
+    >
+      📋 Copy
+    </button>
+      </div>
+      
 
       {/* 🔹 Servers */}
       <div className="mb-6">
