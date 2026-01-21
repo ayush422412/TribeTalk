@@ -128,6 +128,18 @@ class SocketGateway {
     this.socket?.on("sync_messages", handler)
   }
 
+  // onChannelActivity(handler: (data: {channelId: string}) => void) {
+  //   this.socket?.on("channel_activity", 
+  //     // (data)=>{
+  //     // console.log("channelActivity",data)
+  //     handler(data)
+  //   })
+  // }
+  onChannelActivity(handler: (data: {channelId: string}) => void) {
+   this.socket?.on("channel_activity", handler)
+  }
+
+
   onError(handler: (data: { message: string; clientId?: string }) => void) {
     this.socket?.on("error", handler)
   }

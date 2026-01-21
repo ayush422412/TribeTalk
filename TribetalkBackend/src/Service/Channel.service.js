@@ -10,3 +10,17 @@ export const userCanJoin = async ({ userId, serverId }) => {
 
   return true;
 };
+
+export const channelActivity = async ({channelId }) => {
+  const channel = await Channel.findOne({
+    _id: channelId
+  });
+
+  if (!channel) {
+    throw new Error("Channel not found");
+  }
+
+  return  channelId ;channel._id;
+};
+
+

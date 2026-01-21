@@ -185,7 +185,10 @@ export default function setupGateway(io) {
                     clientId: null
                 });
 
-                console.log(`📢 Broadcasted to others in room ${channelId}`);
+                //channel activity broadcast
+                io.emit("channel_activity", {channelId});
+
+                console.log(` Broadcasted to others in room ${channelId}`);
 
             } catch (error) {
                 console.error("❌ Error in send_message:", error);

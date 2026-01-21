@@ -1,9 +1,9 @@
 // hooks/useChannel.ts (FIXED)
 import { useDispatch } from "react-redux"
-import { setActiveChannel, setUnreadCount } from "../features/channels/channel.slice"
+import { setActiveChannel, setUnreadCount,incrementUnreadCountForChannel } from "../features/channels/channel.slice"
 import { useGetServerByIdQuery } from "../features/servers/server.api"
 import { socketGateway } from "../gateway/socket"
-import React, { useEffect } from "react"
+import React, { useEffect } from "react" 
 
 
 
@@ -33,6 +33,15 @@ export function useChannel(serverId: string | null) {
   const handleUnreadCounts = (data: { [channelId: string]: number }) => {
     dispatch(setUnreadCount(data))
   }
+  const incrementUnreadCount = (data: {channelId: string} ) => {
+  
+    
+    dispatch(incrementUnreadCountForChannel(data))
+    
+    
+  }
+
+  socketGateway.onChannelActivity(incrementUnreadCount)
 
   socketGateway.onUnreadCounts(handleUnreadCounts)
 
