@@ -37,4 +37,20 @@ export default class SessionManager {
 
     this.userToSocket.delete(userId);
   }
+
+  // Check if a user is currently connected (at least 1 active socket)
+  isUserOnline(userId) {
+    return this.userToSocket.has(userId) && this.userToSocket.get(userId).size > 0;
+  }
+
+  // Get all active socket IDs for a given user (for targeting)
+  getUserSockets(userId) {
+    const set = this.userToSocket.get(userId);
+    return set ? Array.from(set) : [];
+  }
+
+  // Get the userId for a given socketId
+  getUserId(socketId) {
+    return this.socketToUser.get(socketId) || null;
+  }
 }

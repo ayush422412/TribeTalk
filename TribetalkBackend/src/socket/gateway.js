@@ -42,8 +42,8 @@ export default function setupGateway(io) {
                     });
                 }
             }
-
-            sessionManager.removeUser(socket.user._id.toString());
+            sessionManager.removeSocket(socket.id);
+            // sessionManager.removeUser(socket.user._id.toString());
         });
     });
 }
