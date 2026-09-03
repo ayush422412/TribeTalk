@@ -51,6 +51,11 @@ export default function registerChannelHandlers(io, socket, typingUsers) {
 
     // Typing start
     socket.on("typing_start", ({ channelId }) => {
+        // to stop people spamming unauthorized channels with typing indicators
+        if (!channelId || !socket.rooms.has(channelId)) {
+            return; // Silently discard unauthorized or invalid attempts
+        }
+
         if (!typingUsers.has(channelId)) {
             typingUsers.set(channelId, new Set());
         }
@@ -66,6 +71,9 @@ export default function registerChannelHandlers(io, socket, typingUsers) {
 
     // Typing stop
     socket.on("typing_stop", ({ channelId }) => {
+        if (!channelId || !socket.rooms.has(channelId)) {
+            return;
+        } 
         if (typingUsers.has(channelId)) {
             typingUsers.get(channelId).delete(socket.user._id.toString());
         }

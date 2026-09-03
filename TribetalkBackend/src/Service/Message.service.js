@@ -1,8 +1,19 @@
 import * as messageRepo from "../Repository/Message.repository.js";
+import { checkChannelAccess } from "./Permission.service.js";
 import { ApiError } from "../Utils/ApiError.js";
 
 /**
- * Add a new message
+ * Internal guard for domain-level authorization
+ */
+const assertChannelAccess = async (userId, channelId) => {
+  const hasAccess = await checkChannelAccess(userId, channelId);
+  if (!hasAccess) {
+    throw new ApiError(403, "You do not have permission to access this channel");
+  }
+};
+
+/**
+ * Add a new message (Guarded)
  */
 export const addMessage = async ({ content, channelId, UserId, clientId = null, isSystemMessage = false }) => {
   if (!content?.trim() && !isSystemMessage) {
@@ -12,6 +23,9 @@ export const addMessage = async ({ content, channelId, UserId, clientId = null, 
   if (!UserId || !channelId) {
     throw new ApiError(400, "UserId and ChannelId are required");
   }
+
+  // ✅ Domain-level membership verification
+  await assertChannelAccess(UserId, channelId);
 
   const savedMessage = await messageRepo.createMessage({
     content: content?.trim() || "",
@@ -29,21 +43,27 @@ export const addMessage = async ({ content, channelId, UserId, clientId = null, 
 };
 
 /**
- * Get message history with cursor pagination
+ * Get message history with cursor pagination (Guarded)
  */
-export const getMessageHistory = async ({ channelId, limit = 50, before = null, after = null }) => {
+export const getMessageHistory = async ({ channelId, limit = 50, before = null, after = null, userId = null }) => {
+  if (userId) {
+    await assertChannelAccess(userId, channelId);
+  }
   return await messageRepo.getMessages({ channelId, limit, before, after });
 };
 
 /**
  * Get messages since a specific sequence (for reconnect/sync)
  */
-export const getMissedMessages = async (channelId, sinceSequence) => {
+export const getMissedMessages = async (channelId, sinceSequence, userId = null) => {
+  if (userId) {
+    await assertChannelAccess(userId, channelId);
+  }
   return await messageRepo.getMessagesSinceSequence(channelId, sinceSequence);
 };
 
 /**
- * Edit a message (verifies author ownership via repo atomic update)
+ * Edit a message
  */
 export const editMessage = async (messageId, content, userId) => {
   if (!content?.trim()) {
@@ -60,7 +80,7 @@ export const editMessage = async (messageId, content, userId) => {
 };
 
 /**
- * Delete a message (verifies author ownership)
+ * Delete a message
  */
 export const deleteMessage = async (messageId, userId) => {
   const deletedMessage = await messageRepo.softDeleteMessage(messageId, userId);
@@ -73,9 +93,11 @@ export const deleteMessage = async (messageId, userId) => {
 };
 
 /**
- * Mark messages as read up to a target message (or latest)
+ * Mark messages as read (Guarded)
  */
 export const markAsRead = async (userId, channelId, lastReadMessageId = null) => {
+  await assertChannelAccess(userId, channelId);
+
   let targetMessage = null;
 
   if (lastReadMessageId) {
@@ -87,7 +109,6 @@ export const markAsRead = async (userId, channelId, lastReadMessageId = null) =>
     targetMessage = await messageRepo.getLatestMessage(channelId);
   }
 
-  // Channel has no messages yet
   if (!targetMessage) {
     return null;
   }
@@ -101,9 +122,10 @@ export const markAsRead = async (userId, channelId, lastReadMessageId = null) =>
 };
 
 /**
- * Get unread count for a single channel
+ * Get unread count for a single channel (Guarded)
  */
 export const getUnreadCount = async (userId, channelId) => {
+  await assertChannelAccess(userId, channelId);
   const readState = await messageRepo.findReadState(userId, channelId);
   const lastReadSequence = readState?.lastReadSequence || 0;
 
@@ -138,9 +160,11 @@ export const getReadState = async (userId, channelId) => {
 };
 
 /**
- * Get channel sync data (latest message sequence + user read state)
+ * Get channel sync data (Guarded)
  */
 export const getChannelSyncData = async (userId, channelId) => {
+  await assertChannelAccess(userId, channelId);
+
   const [latestMessage, readState] = await Promise.all([
     messageRepo.getLatestMessage(channelId),
     messageRepo.findReadState(userId, channelId)
