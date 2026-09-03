@@ -4,22 +4,19 @@ import {
     logoutUser, 
     registerUser, 
     refreshAccessToken, 
-    getCurrentUser, 
-
+    getCurrentUser 
 } from "../Controllers/User.controller.js";
 import { verifyJWT } from "../Middlewares/Auth.middleware.js";
 
+const router = Router();
 
-const router = Router()
+// Public routes
+router.route("/register").post(registerUser);
+router.route("/login").post(loginUser);
+router.route("/refresh-token").post(refreshAccessToken);
 
-router.route("/register").post(registerUser)
+// Protected routes
+router.route("/logout").post(verifyJWT, logoutUser);
+router.route("/current-user").get(verifyJWT, getCurrentUser);
 
-router.route("/login").post(loginUser)
-
-//secured routes
-router.route("/logout").post(verifyJWT,  logoutUser)
-router.route("/refresh-token").post(refreshAccessToken)
-router.route("/current-user").get(verifyJWT, getCurrentUser)
-
-
-export default router
+export default router;

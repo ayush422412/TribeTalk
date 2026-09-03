@@ -1,27 +1,4 @@
-// services/message.service.js
-// import * as messageRepo from "../Repository/Message.repository.js";
-// import { ApiError } from "../Utils/ApiError.js";
-
-// export const addMessage = async ({ content, channelId,UserId }) => {
-//   if (!content?.trim()) {
-//     throw new ApiError(400, "Message cannot be empty");
-//   }
-//   if (!UserId || !channelId) {
-//     throw new ApiError(400, "UserId and ChannelId are required");
-//   }
-//   // later to implement for server too
-//   console.log(UserId,content,channelId)
-
-//   return messageRepo.createMessage({
-//     content,
-//     sender: UserId,
-//     channel: channelId
-//   });
-// };
-
-// Service/Message.service.js (UPDATED)
 import * as messageRepo from "../Repository/Message.repository.js";
-import { ReadState } from "../Models/ReadState.model.js";
 import { ApiError } from "../Utils/ApiError.js";
 
 /**
@@ -29,110 +6,126 @@ import { ApiError } from "../Utils/ApiError.js";
  */
 export const addMessage = async ({ content, channelId, UserId, clientId = null, isSystemMessage = false }) => {
   if (!content?.trim() && !isSystemMessage) {
-    throw new ApiError(400, "Message cannot be empty");
+    throw new ApiError(400, "Message content cannot be empty");
   }
+
   if (!UserId || !channelId) {
     throw new ApiError(400, "UserId and ChannelId are required");
   }
 
-  return messageRepo.createMessage({
-    content,
+  const savedMessage = await messageRepo.createMessage({
+    content: content?.trim() || "",
     sender: UserId,
     channel: channelId,
     clientId,
     isSystemMessage
   });
+
+  if (!savedMessage) {
+    throw new ApiError(404, "Channel not found");
+  }
+
+  return savedMessage;
 };
 
 /**
  * Get message history with cursor pagination
  */
 export const getMessageHistory = async ({ channelId, limit = 50, before = null, after = null }) => {
-  return messageRepo.getMessages({ channelId, limit, before, after });
+  return await messageRepo.getMessages({ channelId, limit, before, after });
 };
 
 /**
  * Get messages since a specific sequence (for reconnect/sync)
  */
 export const getMissedMessages = async (channelId, sinceSequence) => {
-  return messageRepo.getMessagesSinceSequence(channelId, sinceSequence);
+  return await messageRepo.getMessagesSinceSequence(channelId, sinceSequence);
 };
 
 /**
- * Edit a message
+ * Edit a message (verifies author ownership via repo atomic update)
  */
 export const editMessage = async (messageId, content, userId) => {
   if (!content?.trim()) {
     throw new ApiError(400, "Message content cannot be empty");
   }
-  return messageRepo.updateMessage(messageId, content, userId);
+
+  const updatedMessage = await messageRepo.updateMessageContent(messageId, userId, content.trim());
+
+  if (!updatedMessage) {
+    throw new ApiError(404, "Message not found or you do not have permission to edit it");
+  }
+
+  return updatedMessage;
 };
 
 /**
- * Delete a message
+ * Delete a message (verifies author ownership)
  */
 export const deleteMessage = async (messageId, userId) => {
-  return messageRepo.deleteMessage(messageId, userId);
+  const deletedMessage = await messageRepo.softDeleteMessage(messageId, userId);
+
+  if (!deletedMessage) {
+    throw new ApiError(404, "Message not found or you do not have permission to delete it");
+  }
+
+  return deletedMessage;
 };
 
 /**
- * Mark messages as read
+ * Mark messages as read up to a target message (or latest)
  */
-export const markAsRead = async (userId, channelId, lastReadMessageId) => {
-  const message = await messageRepo.getLatestMessage(channelId);
-  
-  if (!message && !lastReadMessageId) {
-    // No messages in channel yet
+export const markAsRead = async (userId, channelId, lastReadMessageId = null) => {
+  let targetMessage = null;
+
+  if (lastReadMessageId) {
+    targetMessage = await messageRepo.findMessageById(lastReadMessageId);
+    if (!targetMessage) {
+      throw new ApiError(404, "Target message not found");
+    }
+  } else {
+    targetMessage = await messageRepo.getLatestMessage(channelId);
+  }
+
+  // Channel has no messages yet
+  if (!targetMessage) {
     return null;
   }
 
-  const messageToMark = lastReadMessageId 
-    ? await messageRepo.getMessages({ channelId, limit: 1, before: null, after: null })
-        .then(msgs => msgs.find(m => m._id.toString() === lastReadMessageId))
-    : message;
-
-  if (!messageToMark) {
-    throw new ApiError(404, "Message not found");
-  }
-
-  const readState = await ReadState.findOneAndUpdate(
-    { user: userId, channel: channelId },
-    {
-      lastReadMessageId: messageToMark._id,
-      lastReadSequence: messageToMark.sequence,
-      lastReadAt: new Date()
-    },
-    { upsert: true, new: true }
+  return await messageRepo.upsertReadState(
+    userId,
+    channelId,
+    targetMessage._id,
+    targetMessage.sequence
   );
-
-  return readState;
 };
 
 /**
- * Get unread count for a channel
+ * Get unread count for a single channel
  */
 export const getUnreadCount = async (userId, channelId) => {
-  const readState = await ReadState.findOne({ user: userId, channel: channelId });
+  const readState = await messageRepo.findReadState(userId, channelId);
   const lastReadSequence = readState?.lastReadSequence || 0;
 
-  return messageRepo.countUnreadMessages(channelId, lastReadSequence);
+  return await messageRepo.countUnreadMessages(channelId, lastReadSequence);
 };
-//GET UNREAD COUNTS OF OFF CHANNEL INA SERVER
 
+/**
+ * Get map of unread counts for all user channels
+ */
+export const getUnreadCountsForUser = async (userId) => {
+  const readStates = await messageRepo.findAllUserReadStates(userId);
+  const unreadCounts = {};
 
-export const getUnreadCountsForUser=async (userId) => {
-  const readStates = await ReadState.find({ user: userId});
-  // const lastReadSequence = readState?.lastReadSequence || 0;
-  console.log("readState",readStates)
-  const unreadCounts={}
-  for(const readState of readStates){
-    const channelId=readState.channel._id
-    const lastReadSequence=readState?.lastReadSequence || 0;
-    const count=await messageRepo.countUnreadMessages(channelId, lastReadSequence)
-    unreadCounts[channelId]=count
-
-  }
-  console.log("unreadcounts",unreadCounts)
+  await Promise.all(
+    readStates.map(async (state) => {
+      const channelId = state.channel?.toString();
+      if (channelId) {
+        const count = await messageRepo.countUnreadMessages(channelId, state.lastReadSequence || 0);
+        unreadCounts[channelId] = count;
+      }
+    })
+  );
 
   return unreadCounts;
 };
@@ -141,21 +134,25 @@ export const getUnreadCountsForUser=async (userId) => {
  * Get read state for a user in a channel
  */
 export const getReadState = async (userId, channelId) => {
-  return ReadState.findOne({ user: userId, channel: channelId });
+  return await messageRepo.findReadState(userId, channelId);
 };
 
 /**
- * Get channel sync data (latest message + unread count)
+ * Get channel sync data (latest message sequence + user read state)
  */
 export const getChannelSyncData = async (userId, channelId) => {
-  const latestMessage = await messageRepo.getLatestMessage(channelId);
-  const readState = await getReadState(userId, channelId);
-  const unreadCount = await getUnreadCount(userId, channelId);
+  const [latestMessage, readState] = await Promise.all([
+    messageRepo.getLatestMessage(channelId),
+    messageRepo.findReadState(userId, channelId)
+  ]);
+
+  const lastReadSequence = readState?.lastReadSequence || 0;
+  const unreadCount = await messageRepo.countUnreadMessages(channelId, lastReadSequence);
 
   return {
     latestMessageId: latestMessage?._id || null,
     latestSequence: latestMessage?.sequence || 0,
-    lastReadSequence: readState?.lastReadSequence || 0,
+    lastReadSequence,
     unreadCount
   };
 };

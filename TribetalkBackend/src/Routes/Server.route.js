@@ -9,17 +9,17 @@ import {
 } from "../Controllers/Server.controller.js";
 import { verifyJWT } from "../Middlewares/Auth.middleware.js";
 
+const router = Router();
 
-const router = Router()
+// All server routes require authentication
+router.use(verifyJWT);
 
-//secured routes
-router.route("/create-server").post(verifyJWT,  createServer)
-router.route("/list-all-server").get(verifyJWT,  listServers)
-router.patch("/edit-server/:id", verifyJWT, editServer)
-router.route("/delete-server/:id").delete(verifyJWT,  deleteServer)
+router.route("/create-server").post(createServer);
+router.route("/list-all-server").get(listServers);
+router.patch("/edit-server/:id", editServer);
+router.delete("/delete-server/:id", deleteServer);
 
-router.get("/single-server/:id", verifyJWT, getServerInfo); // Get full server info
-router.post("/join-server/:id", verifyJWT, joinServer)
+router.get("/single-server/:id", getServerInfo);
+router.post("/join-server/:id", joinServer);
 
-
-export default router
+export default router;

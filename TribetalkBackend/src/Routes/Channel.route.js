@@ -4,26 +4,21 @@ import {
     deleteChannel,
     editChannel,
     getChannelInfo
-
 } from "../Controllers/Channel.controller.js";
 import { verifyJWT } from "../Middlewares/Auth.middleware.js";
+import { verifyChannelAccess } from "../Middlewares/ChannelAccess.middleware.js";
 
+const router = Router();
 
-const router = Router()
+// Apply auth to all channel routes
+router.use(verifyJWT);
 
-//secured routes
-router.route("/create-channel").post(verifyJWT, createChannel)
-router.patch("/edit-channel/:id", verifyJWT, editChannel)
-router.get("/channel-info/:id", verifyJWT, getChannelInfo);
-router.route("/delete-channel/:id").delete(verifyJWT, deleteChannel)
+// Create channel (no channel ID yet; server ID & permissions verified in service)
+router.route("/create-channel").post(createChannel);
 
-// router.route("/create-server").post(verifyJWT, createServer)
-// router.route("/list-all-server").get(verifyJWT, listServers)
-// router.patch("/edit-server/:id", verifyJWT, editServer)
-// router.route("/delete-server/:id").delete(verifyJWT, deleteServer)
+// Protected channel operations requiring channel access verification
+router.get("/channel-info/:id", verifyChannelAccess, getChannelInfo);
+router.patch("/edit-channel/:id", verifyChannelAccess, editChannel);
+router.delete("/delete-channel/:id", verifyChannelAccess, deleteChannel);
 
-// router.get("/single-server/:id", verifyJWT, getServerInfo); // Get full server info
-// router.post("/join-server/:id", verifyJWT, joinServer)
-
-
-export default router
+export default router;

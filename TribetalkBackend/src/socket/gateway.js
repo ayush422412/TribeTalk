@@ -1,5 +1,4 @@
 import SessionManager from "./SessionManager.js";
-import ChannelManager from "./ChannelManager.js";
 import { socketAuthMiddleware, channelGuardMiddleware } from "./socket.middleware.js";
 
 import registerChannelHandlers from "./handlers/channel.handler.js";
@@ -10,7 +9,6 @@ const typingUsers = new Map(); // channelId -> Set of userIds
 
 export default function setupGateway(io) {
     const sessionManager = new SessionManager();
-    const channelManager = new ChannelManager(io, sessionManager);
 
     // 1. Handshake authentication
     io.use(socketAuthMiddleware);
