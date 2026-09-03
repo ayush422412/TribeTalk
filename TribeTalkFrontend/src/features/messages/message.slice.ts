@@ -1,9 +1,12 @@
-// features/messages/message.slice.ts (UPDATED)
+// features/messages/message.slice.ts
 import { createSlice } from "@reduxjs/toolkit"
 import type { PayloadAction } from "@reduxjs/toolkit"
 import type { Message, MessageState } from "../types"
 
 const MAX_MESSAGES_PER_CHANNEL = 100
+
+// Helper to get identifier regardless of whether it's 'id' or '_id'
+const getMsgKey = (m: any): string => m?.id || m?._id || m?.clientId || ""
 
 const initialState: MessageState = {
   messagesByChannel: {},
@@ -16,18 +19,36 @@ const messageSlice = createSlice({
   initialState,
   reducers: {
     /**
-     * Set messages for a channel (from REST API or initial sync)
+     * Merge initial REST messages with existing in-flight socket messages
      */
-setMessagesForChannel(
-  state,
-  action: PayloadAction<{ channelId: string; messages: Message[] }>
-) {
-  const { channelId, messages } = action.payload
+    setMessagesForChannel(
+      state,
+      action: PayloadAction<{ channelId: string; messages: Message[] }>
+    ) {
+      const { channelId, messages: restMessages } = action.payload
+      const existingLiveMessages = state.messagesByChannel[channelId] || []
 
-  state.messagesByChannel[channelId] = [...messages]
-    .sort((a, b) => a.sequence - b.sequence)
-    .slice(-MAX_MESSAGES_PER_CHANNEL)
-},
+      // Map keyed by unique message identifier
+      const messageMap = new Map<string, Message>()
+
+      // 1. Seed with historical REST messages
+      for (const msg of restMessages) {
+        const key = getMsgKey(msg)
+        if (key) messageMap.set(key, msg)
+      }
+
+      // 2. Merge existing live socket messages on top (preserving in-flight/newer items)
+      for (const msg of existingLiveMessages) {
+        const key = getMsgKey(msg)
+        if (key) messageMap.set(key, msg)
+      }
+
+      // 3. Sort strictly by sequence and trim window
+      state.messagesByChannel[channelId] = Array.from(messageMap.values())
+        .sort((a, b) => a.sequence - b.sequence)
+        .slice(-MAX_MESSAGES_PER_CHANNEL)
+    },
+
     /**
      * Prepend older messages (for infinite scroll up)
      */
@@ -39,12 +60,13 @@ setMessagesForChannel(
       if (!state.messagesByChannel[channelId]) {
         state.messagesByChannel[channelId] = []
       }
-      
+
       const existing = state.messagesByChannel[channelId]
-      const newMessages = messages.filter(
-        (msg) => !existing.some((m) => m.id === msg.id)
-      )
-      
+      const newMessages = messages.filter((msg) => {
+        const targetKey = getMsgKey(msg)
+        return !existing.some((m) => getMsgKey(m) === targetKey)
+      })
+
       state.messagesByChannel[channelId] = [...newMessages, ...existing]
         .sort((a, b) => a.sequence - b.sequence)
         .slice(-MAX_MESSAGES_PER_CHANNEL)
@@ -63,16 +85,20 @@ setMessagesForChannel(
       }
 
       const messages = state.messagesByChannel[channelId]
+      const incomingKey = getMsgKey(message)
 
-      // Check if message already exists
-      const exists = messages.some((m) => m.id === message.id)
+      // Deduplicate against id, _id, or matching clientId
+      const exists = messages.some((m) => {
+        return (
+          getMsgKey(m) === incomingKey ||
+          (message.clientId && m.clientId === message.clientId)
+        )
+      })
+
       if (!exists) {
         messages.push(message)
-        
-        // Keep sorted by sequence
         messages.sort((a, b) => a.sequence - b.sequence)
 
-        // Trim to last 100 messages
         if (messages.length > MAX_MESSAGES_PER_CHANNEL) {
           state.messagesByChannel[channelId] = messages.slice(-MAX_MESSAGES_PER_CHANNEL)
         }
@@ -93,6 +119,16 @@ setMessagesForChannel(
       const index = messages.findIndex((m) => m.clientId === clientId)
       if (index !== -1) {
         messages[index] = message
+      } else {
+        // Fallback: If not found by clientId, check by key or append
+        const key = getMsgKey(message)
+        const keyIndex = messages.findIndex((m) => getMsgKey(m) === key)
+        if (keyIndex !== -1) {
+          messages[keyIndex] = message
+        } else {
+          messages.push(message)
+          messages.sort((a, b) => a.sequence - b.sequence)
+        }
       }
     },
 
@@ -107,7 +143,8 @@ setMessagesForChannel(
       const messages = state.messagesByChannel[channelId]
       if (!messages) return
 
-      const index = messages.findIndex((m) => m.id === message.id)
+      const targetKey = getMsgKey(message)
+      const index = messages.findIndex((m) => getMsgKey(m) === targetKey)
       if (index !== -1) {
         messages[index] = message
       }
@@ -124,9 +161,8 @@ setMessagesForChannel(
       const messages = state.messagesByChannel[channelId]
       if (!messages) return
 
-      const index = messages.findIndex((m) => m.id === messageId)
+      const index = messages.findIndex((m) => getMsgKey(m) === messageId)
       if (index !== -1) {
-        // Replace with deleted placeholder
         messages[index] = {
           ...messages[index],
           content: "[Message deleted]",
@@ -167,7 +203,7 @@ setMessagesForChannel(
       state,
       action: PayloadAction<{ channelId: string; userId: string; username: string }>
     ) {
-      const { channelId, userId, username } = action.payload
+      const { channelId, username } = action.payload
       if (!state.typingUsers[channelId]) {
         state.typingUsers[channelId] = []
       }
@@ -185,14 +221,12 @@ setMessagesForChannel(
     ) {
       const { channelId } = action.payload
       if (state.typingUsers[channelId]) {
-        // For simplicity, clear all typing users when one stops
-        // In production, you'd track by userId
         delete state.typingUsers[channelId]
       }
     },
 
     /**
-     * Clear all messages for a channel (when leaving)
+     * Clear all messages for a channel
      */
     clearChannelMessages(state, action: PayloadAction<string>) {
       delete state.messagesByChannel[action.payload]
